@@ -19,6 +19,9 @@ final class SkinLesionPhoto {
     @Relationship(deleteRule: .cascade)
     var metadata: PhotoMetadata?
     
+    // Relacionamento com exame (uma foto pertence a um exame)
+    var exam: Exam?
+    
     init(
         imageData: Data,
         captureDate: Date = Date(),

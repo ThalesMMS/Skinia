@@ -4,6 +4,7 @@ import SwiftUI
 @MainActor
 final class AnalysisListCoordinator: NavigationCoordinator, ObservableObject {
     @Published var navigationPath = NavigationPath()
+    @Published var shouldRefresh = false
     
     var parent: (any Coordinator)?
     var children: [any Coordinator] = []
@@ -16,6 +17,12 @@ final class AnalysisListCoordinator: NavigationCoordinator, ObservableObject {
     
     func start() {
         // Inicialização se necessária
+    }
+    
+    func refreshList() async {
+        await MainActor.run {
+            shouldRefresh = true
+        }
     }
     
     @ViewBuilder

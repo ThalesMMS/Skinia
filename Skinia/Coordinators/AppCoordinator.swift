@@ -28,6 +28,23 @@ final class AppCoordinator: TabCoordinator, ObservableObject {
         }
     }
     
+    func selectTab(_ index: Int) {
+        selectedTab = index
+        // If switching to analysis list, refresh it
+        if index == 0 {
+            Task {
+                await refreshAnalysList()
+            }
+        }
+    }
+    
+    private func refreshAnalysList() async {
+        // Notify analysis list to refresh
+        if let analysisCoordinator = tabCoordinators.first as? AnalysisListCoordinator {
+            await analysisCoordinator.refreshList()
+        }
+    }
+    
     private func setupTabCoordinators() {
         tabCoordinators = [
             analysisListCoordinator,

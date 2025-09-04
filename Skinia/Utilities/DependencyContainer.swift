@@ -24,7 +24,8 @@ final class DependencyContainer: DependencyContainerProtocol {
         let schema = Schema([
             SkinLesionPhoto.self,
             AnalysisResult.self,
-            PhotoMetadata.self
+            PhotoMetadata.self,
+            Exam.self
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,
@@ -75,7 +76,7 @@ protocol AnalysisServiceProtocol {
 
 @MainActor
 protocol CameraServiceProtocol {
-    func savePhoto(_ imageData: Data, bodyLocation: String?, userNotes: String?, metadata: PhotoMetadata) async throws -> SkinLesionPhoto
+    func savePhoto(_ imageData: Data, bodyLocation: String?, userNotes: String?, patientName: String?, patientID: String?, metadata: PhotoMetadata) async throws -> SkinLesionPhoto
     func checkCameraPermission() async -> Bool
 }
 
@@ -332,7 +333,11 @@ final class CameraService: CameraServiceProtocol {
         self.analysisService = analysisService
     }
     
-    func savePhoto(_ imageData: Data, bodyLocation: String?, userNotes: String?, metadata: PhotoMetadata) async throws -> SkinLesionPhoto {
+    func savePhoto(_ imageData: Data, bodyLocation: String?, userNotes: String?, patientName: String?, patientID: String?, metadata: PhotoMetadata) async throws -> SkinLesionPhoto {
+        // Create or find existing exam for this patient
+        let exam = try await findOrCreateExam(patientName: patientName, patientID: patientID)
+        
+        // Create the photo
         let photo = SkinLesionPhoto(
             imageData: imageData,
             analysisStatus: .pending,
@@ -343,6 +348,11 @@ final class CameraService: CameraServiceProtocol {
         metadata.bodyLocation = bodyLocation
         photo.metadata = metadata
         
+        // Associate photo with exam
+        photo.exam = exam
+        exam.addPhoto(photo)
+        
+        // Save exam (which will save the photo due to relationship)
         try photoRepository.save(photo)
         
         // Automatically start analysis
@@ -351,6 +361,12 @@ final class CameraService: CameraServiceProtocol {
         }
         
         return photo
+    }
+    
+    private func findOrCreateExam(patientName: String?, patientID: String?) async throws -> Exam {
+        // For now, create a new exam for each photo
+        // In a real app, you might want to group photos from the same session
+        return Exam(patientName: patientName, patientID: patientID)
     }
     
     func checkCameraPermission() async -> Bool {

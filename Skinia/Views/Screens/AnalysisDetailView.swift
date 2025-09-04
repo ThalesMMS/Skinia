@@ -372,9 +372,9 @@ struct AnalysisDetailView: View {
                 .font(.title2)
                 .fontWeight(.bold)
             
-            if !result.recommendations.isEmpty {
+            if !result.recommendationsList.isEmpty {
                 VStack(alignment: .leading, spacing: 12) {
-                    ForEach(Array(result.recommendations.enumerated()), id: \.offset) { index, recommendation in
+                    ForEach(Array(result.recommendationsList.enumerated()), id: \.offset) { index, recommendation in
                         HStack(alignment: .top, spacing: 12) {
                             ZStack {
                                 Circle()
@@ -408,7 +408,7 @@ struct AnalysisDetailView: View {
                         }
                         .padding(.vertical, 8)
                         
-                        if index < result.recommendations.count - 1 {
+                        if index < result.recommendationsList.count - 1 {
                             Divider()
                         }
                     }
@@ -857,7 +857,7 @@ struct ShareSheet: UIViewControllerRepresentable {
         ⚠️ Nível de Risco: \(result.riskLevel.displayName)
         
         📋 RECOMENDAÇÕES:
-        \(result.recommendations.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n"))
+        \(result.recommendationsList.enumerated().map { "\($0.offset + 1). \($0.element)" }.joined(separator: "\n"))
         
         ⚠️ IMPORTANTE: Este relatório é gerado por inteligência artificial e não substitui a consulta médica profissional. Sempre procure um dermatologista para diagnóstico definitivo.
         

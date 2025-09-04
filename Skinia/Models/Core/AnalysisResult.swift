@@ -7,12 +7,11 @@ final class AnalysisResult {
     var confidence: Double
     var lesionType: String
     var riskLevel: RiskLevel
-    var recommendations: [String]
+    var recommendations: String = "[]" // Store as JSON string directly 
     var analysisDate: Date
     var additionalNotes: String?
     
-    // Relacionamento com a foto
-    var photo: SkinLesionPhoto?
+    // Relacionamento inverso removido para evitar ciclos no SwiftData
     
     init(
         confidence: Double,
@@ -26,9 +25,38 @@ final class AnalysisResult {
         self.confidence = confidence
         self.lesionType = lesionType
         self.riskLevel = riskLevel
-        self.recommendations = recommendations
+        self.recommendations = Self.encodeRecommendations(recommendations)
         self.analysisDate = analysisDate
         self.additionalNotes = additionalNotes
+    }
+    
+    // MARK: - Computed property for recommendations array
+    var recommendationsList: [String] {
+        get {
+            return Self.decodeRecommendations(recommendations)
+        }
+        set {
+            recommendations = Self.encodeRecommendations(newValue)
+        }
+    }
+    
+    // MARK: - Private helpers for JSON encoding/decoding
+    private static func encodeRecommendations(_ recommendations: [String]) -> String {
+        do {
+            let data = try JSONEncoder().encode(recommendations)
+            return String(data: data, encoding: .utf8) ?? "[]"
+        } catch {
+            return "[]"
+        }
+    }
+    
+    private static func decodeRecommendations(_ data: String) -> [String] {
+        guard let jsonData = data.data(using: .utf8) else { return [] }
+        do {
+            return try JSONDecoder().decode([String].self, from: jsonData)
+        } catch {
+            return []
+        }
     }
 }
 

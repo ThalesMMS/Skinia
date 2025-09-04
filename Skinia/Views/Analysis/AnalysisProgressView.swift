@@ -41,63 +41,78 @@ struct AnalysisProgressView: View {
     }
     
     private var photoSection: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: DesignSystem.Spacing.md) {
             if let image = photo.fullImage {
                 Image(uiImage: image)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .frame(width: 150, height: 150)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg))
+                    .designShadow(DesignSystem.Shadows.medium)
                     .overlay(
-                        RoundedRectangle(cornerRadius: 12)
-                            .stroke(Color(.systemGray4), lineWidth: 1)
+                        RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg)
+                            .stroke(DesignSystem.Colors.backgroundSecondary, lineWidth: 2)
                     )
             }
             
+            if let bodyLocation = photo.metadata?.bodyLocation {
+                Text(bodyLocation)
+                    .font(DesignSystem.Typography.subheadline)
+                    .foregroundColor(DesignSystem.Colors.primary)
+                    .fontWeight(.medium)
+            }
+            
             Text("ID: \(photo.id.uuidString.prefix(8))")
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(DesignSystem.Typography.caption)
+                .foregroundColor(DesignSystem.Colors.textSecondary)
         }
     }
     
     private func progressSection(_ progress: AnalysisProgress) -> some View {
-        VStack(spacing: 20) {
+        VStack(spacing: DesignSystem.Spacing.xl) {
             // Current stage
-            VStack(spacing: 8) {
+            VStack(spacing: DesignSystem.Spacing.md) {
                 HStack {
                     Image(systemName: progress.currentStage.systemIcon)
-                        .font(.title2)
-                        .foregroundColor(.blue)
+                        .font(DesignSystem.Typography.title2)
+                        .foregroundColor(stageColor(progress.currentStage))
+                        .imageScale(.large)
                     
                     Text(progress.currentStage.displayName)
-                        .font(.headline)
-                        .foregroundColor(.primary)
+                        .font(DesignSystem.Typography.headline)
+                        .foregroundColor(DesignSystem.Colors.text)
                     
                     Spacer()
+                    
+                    if progress.currentStage != .completed && progress.currentStage != .failed {
+                        LoadingDots()
+                            .scaleEffect(0.8)
+                    }
                 }
                 
                 // Overall progress bar
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                     HStack {
                         Text("Progresso Geral")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                            .font(DesignSystem.Typography.medicalCaption)
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
                         
                         Spacer()
                         
                         Text("\(Int(progress.overallProgress * 100))%")
-                            .font(.caption)
+                            .font(DesignSystem.Typography.medicalCaption)
                             .fontWeight(.semibold)
+                            .foregroundColor(DesignSystem.Colors.primary)
                     }
                     
                     ProgressView(value: progress.overallProgress)
-                        .progressViewStyle(LinearProgressViewStyle())
-                        .scaleEffect(y: 1.5)
+                        .progressViewStyle(LinearProgressViewStyle(tint: DesignSystem.Colors.primary))
+                        .scaleEffect(y: 2.0)
                 }
             }
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
+            .padding(DesignSystem.Spacing.lg)
+            .cardStyle()
+            .designShadow(DesignSystem.Shadows.card)
             
             // Stage progress
             if progress.currentStage != .completed && progress.currentStage != .failed {
@@ -150,85 +165,131 @@ struct AnalysisProgressView: View {
     
     private func timeInfoSection(_ progress: AnalysisProgress) -> some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Tempo Decorrido")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                Label("Tempo Decorrido", systemImage: "clock")
+                    .font(DesignSystem.Typography.medicalCaption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
                 
                 Text(progress.formattedElapsedTime)
-                    .font(.subheadline)
+                    .font(DesignSystem.Typography.subheadline)
                     .fontWeight(.medium)
+                    .foregroundColor(DesignSystem.Colors.text)
             }
             
             Spacer()
             
             if let remainingTime = progress.formattedEstimatedTimeRemaining,
                progress.currentStage != .completed && progress.currentStage != .failed {
-                VStack(alignment: .trailing, spacing: 4) {
-                    Text("Tempo Restante")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                VStack(alignment: .trailing, spacing: DesignSystem.Spacing.xs) {
+                    Label("Tempo Restante", systemImage: "timer")
+                        .font(DesignSystem.Typography.medicalCaption)
+                        .foregroundColor(DesignSystem.Colors.textSecondary)
                     
                     Text(remainingTime)
-                        .font(.subheadline)
+                        .font(DesignSystem.Typography.subheadline)
                         .fontWeight(.medium)
+                        .foregroundColor(DesignSystem.Colors.primary)
                 }
             }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(8)
+        .padding(DesignSystem.Spacing.lg)
+        .cardStyle()
     }
     
     private func errorSection(_ errorMessage: String) -> some View {
-        HStack {
+        HStack(spacing: DesignSystem.Spacing.md) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .foregroundColor(.red)
+                .font(DesignSystem.Typography.title3)
+                .foregroundColor(DesignSystem.Colors.error)
             
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
                 Text("Erro na Análise")
-                    .font(.subheadline)
+                    .font(DesignSystem.Typography.subheadline)
                     .fontWeight(.medium)
-                    .foregroundColor(.red)
+                    .foregroundColor(DesignSystem.Colors.error)
                 
                 Text(errorMessage)
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                    .font(DesignSystem.Typography.medicalCaption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
+                    .multilineTextAlignment(.leading)
             }
             
             Spacer()
         }
-        .padding()
-        .background(Color.red.opacity(0.1))
-        .cornerRadius(8)
+        .padding(DesignSystem.Spacing.lg)
+        .background(DesignSystem.Colors.error.opacity(0.1))
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg)
+                .stroke(DesignSystem.Colors.error.opacity(0.3), lineWidth: 1)
+        )
+        .cornerRadius(DesignSystem.CornerRadius.lg)
     }
     
     private var actionButtons: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: DesignSystem.Spacing.md) {
             if let progress = progress {
                 switch progress.currentStage {
                 case .completed:
-                    Button("Ver Resultado") {
+                    Button {
                         // Navigate to results
+                    } label: {
+                        HStack {
+                            Image(systemName: "eye.fill")
+                            Text("Ver Resultado")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(DesignSystem.Colors.success)
+                        .foregroundColor(.white)
+                        .cornerRadius(DesignSystem.CornerRadius.lg)
+                        .font(DesignSystem.Typography.body)
+                        .fontWeight(.semibold)
                     }
-                    .buttonStyle(.borderedProminent)
                     
                 case .failed:
-                    Button("Tentar Novamente") {
+                    Button {
                         Task {
+                            HapticManager.shared.impact(.medium)
                             try await analysisService.retryAnalysis(for: photo)
                             startProgressTracking()
                         }
+                    } label: {
+                        HStack {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Tentar Novamente")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(DesignSystem.Colors.primary)
+                        .foregroundColor(.white)
+                        .cornerRadius(DesignSystem.CornerRadius.lg)
+                        .font(DesignSystem.Typography.body)
+                        .fontWeight(.semibold)
                     }
-                    .buttonStyle(.borderedProminent)
                     
                 default:
-                    Button("Cancelar Análise") {
+                    Button {
                         Task {
+                            HapticManager.shared.impact(.light)
                             await analysisService.cancelAnalysis(for: photo.id)
                         }
+                    } label: {
+                        HStack {
+                            Image(systemName: "xmark.circle")
+                            Text("Cancelar Análise")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(DesignSystem.Colors.backgroundSecondary)
+                        .foregroundColor(DesignSystem.Colors.error)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg)
+                                .stroke(DesignSystem.Colors.error.opacity(0.5), lineWidth: 1)
+                        )
+                        .cornerRadius(DesignSystem.CornerRadius.lg)
+                        .font(DesignSystem.Typography.body)
+                        .fontWeight(.medium)
                     }
-                    .buttonStyle(.bordered)
                 }
             }
         }
@@ -251,6 +312,21 @@ struct AnalysisProgressView: View {
     private func stopProgressTracking() {
         timer?.invalidate()
         timer = nil
+    }
+    
+    private func stageColor(_ stage: AnalysisStage) -> Color {
+        switch stage {
+        case .uploading:
+            return DesignSystem.Colors.info
+        case .preprocessing, .analyzing:
+            return DesignSystem.Colors.warning
+        case .postprocessing:
+            return DesignSystem.Colors.primary
+        case .completed:
+            return DesignSystem.Colors.success
+        case .failed:
+            return DesignSystem.Colors.error
+        }
     }
 }
 

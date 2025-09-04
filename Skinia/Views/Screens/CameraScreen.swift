@@ -2,6 +2,8 @@ import SwiftUI
 import AVFoundation
 import ImageIO
 import CoreGraphics
+import PhotosUI
+import Photos
 
 struct CameraScreen: View {
     @StateObject private var coordinator: CameraCoordinator
@@ -14,10 +16,15 @@ struct CameraScreen: View {
     @State private var isSaving = false
     @State private var selectedBodyLocation = ""
     @State private var userNotes = ""
+    @State private var patientName = ""
+    @State private var patientID = ""
+    @State private var showingPhotoPicker = false
+    @State private var selectedPhotoItem: PhotosPickerItem?
     
     init(coordinator: CameraCoordinator) {
         self._coordinator = StateObject(wrappedValue: coordinator)
     }
+    
     
     var body: some View {
         Group {
@@ -40,6 +47,7 @@ struct CameraScreen: View {
         .onAppear {
             Task {
                 _ = await permissionManager.requestPermission()
+                coordinator.start() // Initialize photo library status
             }
         }
         .sheet(isPresented: $showingCamera) {
@@ -59,9 +67,11 @@ struct CameraScreen: View {
                 PhotoPreviewView(
                     image: image,
                     metadata: imageMetadata,
-                    onSave: { bodyLocation, notes in
+                    onSave: { bodyLocation, notes, patientNameInput, patientIDInput in
                         selectedBodyLocation = bodyLocation
                         userNotes = notes
+                        patientName = patientNameInput
+                        patientID = patientIDInput
                         Task {
                             await savePhoto()
                         }
@@ -76,64 +86,97 @@ struct CameraScreen: View {
     }
     
     private var cameraInterface: some View {
-        VStack(spacing: 30) {
-            Spacer()
-            
-            // Camera icon and instructions
-            VStack(spacing: 20) {
-                Image(systemName: "camera.viewfinder")
-                    .font(.system(size: 100))
-                    .foregroundColor(.blue)
-                
-                VStack(spacing: 12) {
-                    Text("Capture uma Foto")
-                        .font(.title)
-                        .fontWeight(.semibold)
+        ScrollView {
+            VStack(spacing: 30) {
+                // Camera icon and instructions
+                VStack(spacing: 20) {
+                    Image(systemName: "camera.viewfinder")
+                        .font(.system(size: 100))
+                        .foregroundColor(.blue)
                     
-                    Text("Posicione a lesão de pele no centro da tela para uma melhor análise.")
-                        .font(.body)
-                        .foregroundColor(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                    VStack(spacing: 12) {
+                        Text("Capture uma Foto")
+                            .font(.title)
+                            .fontWeight(.semibold)
+                        
+                        Text("Posicione a lesão de pele no centro da tela para uma melhor análise.")
+                            .font(.body)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .padding(.horizontal)
+                    }
                 }
-            }
-            
-            Spacer()
-            
-            // Capture button
-            Button {
-                showingCamera = true
-            } label: {
-                HStack {
-                    Image(systemName: "camera")
-                    Text("Abrir Câmera")
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(12)
-                .font(.headline)
-            }
-            .padding(.horizontal)
-            
-            // Tips section
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Dicas para uma boa foto:")
-                    .font(.headline)
-                    .foregroundColor(.primary)
+                .padding(.top, 20)
                 
-                VStack(alignment: .leading, spacing: 8) {
-                    tipRow("Boa iluminação natural", icon: "sun.max")
-                    tipRow("Foco na lesão", icon: "viewfinder.circle")
-                    tipRow("Evitar sombras", icon: "flashlight.off.fill")
-                    tipRow("Câmera estável", icon: "hand.raised")
+                // Action buttons
+                VStack(spacing: 12) {
+                    // Capture button
+                    Button {
+                        showingCamera = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "camera")
+                            Text("Abrir Câmera")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(DesignSystem.Colors.primary)
+                        .foregroundColor(.white)
+                        .cornerRadius(DesignSystem.CornerRadius.lg)
+                        .font(.headline)
+                    }
+                    
+                    // Photo library button
+                    PhotosPicker(
+                        selection: $selectedPhotoItem,
+                        matching: .images,
+                        photoLibrary: .shared()
+                    ) {
+                        HStack {
+                            Image(systemName: "photo.on.rectangle")
+                            Text("Escolher da Galeria")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(DesignSystem.Colors.backgroundSecondary)
+                        .foregroundColor(DesignSystem.Colors.primary)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg)
+                                .stroke(DesignSystem.Colors.primary, lineWidth: 1)
+                        )
+                        .cornerRadius(DesignSystem.CornerRadius.lg)
+                        .font(.headline)
+                    }
+                    .onChange(of: selectedPhotoItem) { _, newItem in
+                        Task {
+                            if let newItem = newItem {
+                                await loadPhotoFromLibrary(newItem)
+                            }
+                        }
+                    }
                 }
+                .padding(.horizontal)
+                
+                // Tips section
+                VStack(alignment: .leading, spacing: 12) {
+                    Text("Dicas para uma boa análise:")
+                        .font(DesignSystem.Typography.headline)
+                        .foregroundColor(DesignSystem.Colors.text)
+                    
+                    VStack(alignment: .leading, spacing: 8) {
+                        tipRow("Boa iluminação natural", icon: "sun.max")
+                        tipRow("Foco claro na lesão", icon: "viewfinder.circle")
+                        tipRow("Evitar sombras", icon: "flashlight.off.fill")
+                        tipRow("Imagem nítida e estável", icon: "hand.raised")
+                        tipRow("Pode usar fotos existentes", icon: "photo.on.rectangle")
+                    }
+                }
+                .padding(DesignSystem.Spacing.lg)
+                .cardStyle()
+                .padding(.horizontal)
+                
+                Spacer(minLength: 50)
             }
-            .padding()
-            .background(Color(.systemGray6))
-            .cornerRadius(12)
-            .padding(.horizontal)
         }
         .overlay(
             Group {
@@ -159,14 +202,33 @@ struct CameraScreen: View {
     private func tipRow(_ text: String, icon: String) -> some View {
         HStack(spacing: 12) {
             Image(systemName: icon)
-                .foregroundColor(.blue)
+                .foregroundColor(DesignSystem.Colors.primary)
                 .frame(width: 20)
             
             Text(text)
-                .font(.body)
-                .foregroundColor(.primary)
+                .font(DesignSystem.Typography.body)
+                .foregroundColor(DesignSystem.Colors.text)
             
             Spacer()
+        }
+    }
+    
+    private func loadPhotoFromLibrary(_ item: PhotosPickerItem) async {
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self),
+                  let image = UIImage(data: data) else {
+                print("Failed to load image from photo library")
+                return
+            }
+            
+            await MainActor.run {
+                capturedImage = image
+                imageMetadata = nil // Photo library images don't have camera metadata
+                showingPreview = true
+                selectedPhotoItem = nil
+            }
+        } catch {
+            print("Error loading photo from library: \(error)")
         }
     }
     
@@ -182,11 +244,13 @@ struct CameraScreen: View {
             // Create metadata
             let metadata = createPhotoMetadata(from: imageMetadata, imageSize: image.size, dataSize: imageData.count)
             
-            // Save photo using camera service
-            _ = try await coordinator.dependencyContainer.cameraService.savePhoto(
+            // Save photo using coordinator with patient info
+            _ = try await coordinator.savePhotoToAnalysisList(
                 imageData,
                 bodyLocation: selectedBodyLocation.isEmpty ? nil : selectedBodyLocation,
                 userNotes: userNotes.isEmpty ? nil : userNotes,
+                patientName: patientName.isEmpty ? nil : patientName,
+                patientID: patientID.isEmpty ? nil : patientID,
                 metadata: metadata
             )
             
@@ -197,6 +261,8 @@ struct CameraScreen: View {
                 imageMetadata = nil
                 selectedBodyLocation = ""
                 userNotes = ""
+                patientName = ""
+                patientID = ""
                 isSaving = false
             }
             

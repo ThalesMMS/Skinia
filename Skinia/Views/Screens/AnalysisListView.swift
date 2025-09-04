@@ -127,7 +127,28 @@ struct AnalysisListView: View {
             }
         }
         .onAppear {
-            viewModel.loadMockData() // For development - will be replaced with real data loading
+            // Load real data from repository
+            viewModel.loadPhotos()
+            // Also load some mock data for development if no real data exists
+            if !viewModel.hasPhotos {
+                viewModel.loadMockData()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
+            // Refresh data when app comes back to foreground
+            Task {
+                await viewModel.refreshPhotos()
+            }
+        }
+        .onChange(of: coordinator.shouldRefresh) { _, shouldRefresh in
+            if shouldRefresh {
+                Task {
+                    await viewModel.refreshPhotos()
+                    await MainActor.run {
+                        coordinator.shouldRefresh = false
+                    }
+                }
+            }
         }
         .sheet(isPresented: $sheetState.isShowing) {
             let _ = print("🔍 Sheet building - isShowing: \(sheetState.isShowing), selectedPhoto: \(sheetState.selectedPhoto?.id.uuidString ?? "nil")")

@@ -1,9 +1,11 @@
 import Foundation
 import SwiftUI
+import Photos
 
 @MainActor
 final class CameraCoordinator: NavigationCoordinator, ObservableObject {
     @Published var navigationPath = NavigationPath()
+    @Published var photoLibraryStatus: PHAuthorizationStatus = .notDetermined
     
     var parent: (any Coordinator)?
     var children: [any Coordinator] = []
@@ -15,7 +17,8 @@ final class CameraCoordinator: NavigationCoordinator, ObservableObject {
     }
     
     func start() {
-        // Inicialização se necessária
+        // Check initial photo library authorization status
+        photoLibraryStatus = PHPhotoLibrary.authorizationStatus()
     }
     
     func navigateToAnalysisList() {
@@ -23,6 +26,28 @@ final class CameraCoordinator: NavigationCoordinator, ObservableObject {
         if let tabCoordinator = parent as? (any TabCoordinator) {
             tabCoordinator.selectTab(0)
         }
+    }
+    
+    func requestPhotoLibraryAccess() async -> Bool {
+        return await withCheckedContinuation { continuation in
+            PHPhotoLibrary.requestAuthorization { status in
+                DispatchQueue.main.async {
+                    self.photoLibraryStatus = status
+                    continuation.resume(returning: status == .authorized || status == .limited)
+                }
+            }
+        }
+    }
+    
+    func savePhotoToAnalysisList(_ imageData: Data, bodyLocation: String?, userNotes: String?, patientName: String?, patientID: String?, metadata: PhotoMetadata) async throws -> SkinLesionPhoto {
+        return try await dependencyContainer.cameraService.savePhoto(
+            imageData,
+            bodyLocation: bodyLocation,
+            userNotes: userNotes,
+            patientName: patientName,
+            patientID: patientID,
+            metadata: metadata
+        )
     }
     
     @ViewBuilder

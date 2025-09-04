@@ -5,12 +5,14 @@ import CoreGraphics
 struct PhotoPreviewView: View {
     let image: UIImage
     let metadata: [String: Any]?
-    let onSave: (String, String) -> Void  // bodyLocation, userNotes
+    let onSave: (String, String, String, String) -> Void  // bodyLocation, userNotes, patientName, patientID
     let onRetake: () -> Void
     
     @State private var showingBodyLocationPicker = false
     @State private var selectedBodyLocation: String = ""
     @State private var userNotes: String = ""
+    @State private var patientName: String = ""
+    @State private var patientID: String = ""
     
     private let bodyLocationOptions = [
         "Rosto", "Pescoço", "Braço Direito", "Braço Esquerdo", 
@@ -19,19 +21,72 @@ struct PhotoPreviewView: View {
         "Pé Direito", "Pé Esquerdo", "Outros"
     ]
     
+    // MARK: - Computed Properties
+    
+    private var isPatientInfoValid: Bool {
+        return !patientName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || 
+               !patientID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+    
     var body: some View {
         NavigationView {
             VStack(spacing: 0) {
-                // Image preview
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(maxHeight: UIScreen.main.bounds.height * 0.6)
-                    .clipped()
-                
-                // Form section
+                // Scrollable content including image and form
                 ScrollView {
                     VStack(spacing: 20) {
+                        // Image preview
+                        Image(uiImage: image)
+                            .resizable()
+                            .aspectRatio(contentMode: .fit)
+                            .frame(maxHeight: UIScreen.main.bounds.height * 0.5)
+                            .clipped()
+                            .cornerRadius(12)
+                            .padding(.horizontal)
+                        // Patient Information Section
+                        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+                            Text("Informações do Paciente")
+                                .font(DesignSystem.Typography.headline)
+                                .foregroundColor(DesignSystem.Colors.text)
+                            
+                            VStack(spacing: DesignSystem.Spacing.sm) {
+                                // Patient Name Field
+                                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                                    Text("Nome do Paciente")
+                                        .font(DesignSystem.Typography.medicalCaption)
+                                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                                    
+                                    TextField("Digite o nome completo", text: $patientName)
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .font(DesignSystem.Typography.body)
+                                }
+                                
+                                // Patient ID Field
+                                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
+                                    Text("ID/Registro do Paciente")
+                                        .font(DesignSystem.Typography.medicalCaption)
+                                        .foregroundColor(DesignSystem.Colors.textSecondary)
+                                    
+                                    TextField("Ex: 12345 ou RG123456", text: $patientID)
+                                        .textFieldStyle(RoundedBorderTextFieldStyle())
+                                        .font(DesignSystem.Typography.body)
+                                }
+                                
+                                // Validation message
+                                if patientName.isEmpty && patientID.isEmpty {
+                                    HStack {
+                                        Image(systemName: "info.circle")
+                                            .foregroundColor(DesignSystem.Colors.warning)
+                                        Text("Preencha pelo menos o nome ou ID do paciente")
+                                            .font(DesignSystem.Typography.caption)
+                                            .foregroundColor(DesignSystem.Colors.warning)
+                                    }
+                                    .padding(.top, DesignSystem.Spacing.xs)
+                                }
+                            }
+                        }
+                        .padding(DesignSystem.Spacing.lg)
+                        .cardStyle()
+                        
                         // Body location picker
                         VStack(alignment: .leading, spacing: 8) {
                             Text("Local do Corpo")
@@ -67,15 +122,17 @@ struct PhotoPreviewView: View {
                         if let metadata = metadata {
                             metadataSection(metadata)
                         }
+                        
+                        // Add some bottom padding for safe scrolling
+                        Spacer(minLength: 100)
                     }
                     .padding(.horizontal)
                 }
-                .frame(maxHeight: .infinity)
                 
                 // Action buttons
                 VStack(spacing: 12) {
                     Button {
-                        onSave(selectedBodyLocation, userNotes)
+                        onSave(selectedBodyLocation, userNotes, patientName, patientID)
                     } label: {
                         HStack {
                             Image(systemName: "checkmark")
@@ -83,11 +140,11 @@ struct PhotoPreviewView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(Color.blue)
+                        .background(isPatientInfoValid && !selectedBodyLocation.isEmpty ? Color.blue : Color(.systemGray4))
                         .foregroundColor(.white)
                         .cornerRadius(12)
                     }
-                    .disabled(selectedBodyLocation.isEmpty)
+                    .disabled(!isPatientInfoValid || selectedBodyLocation.isEmpty)
                     
                     Button {
                         onRetake()
@@ -224,8 +281,8 @@ struct PhotoPreviewView: View {
     PhotoPreviewView(
         image: sampleImage,
         metadata: nil,
-        onSave: { location, notes in 
-            print("Save tapped - Location: \(location), Notes: \(notes)") 
+        onSave: { location, notes, patientName, patientID in 
+            print("Save tapped - Location: \(location), Notes: \(notes), Patient: \(patientName), ID: \(patientID)") 
         },
         onRetake: { print("Retake tapped") }
     )
