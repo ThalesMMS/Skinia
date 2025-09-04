@@ -128,7 +128,8 @@ struct AnalysisDetailView: View {
                 actionsSection
                     .id("actions-section")
             }
-            .padding(DesignSystem.Spacing.lg)
+            .padding(.horizontal, DesignSystem.Spacing.lg)
+            .padding(.vertical, DesignSystem.Spacing.md)
         }
         .background(DesignSystem.Colors.background)
         .navigationTitle("Análise Dermatológica")
@@ -163,17 +164,20 @@ struct AnalysisDetailView: View {
     private var photoSection: some View {
         let _ = print("🔍 PhotoSection rendering - has image: \(photo.fullImage != nil)")
         
-        return VStack(spacing: DesignSystem.Spacing.md) {
+        return Group {
             if let image = photo.fullImage {
+                let aspectRatio = image.size.width / image.size.height
+                let optimalHeight = calculateOptimalHeight(for: aspectRatio)
+                
                 Button {
                     showingFullScreenImage = true
                     HapticManager.shared.impact(.light)
                 } label: {
                     Image(uiImage: image)
                         .resizable()
-                        .aspectRatio(contentMode: .fill)
-                        .frame(height: 300)
-                        .clipped()
+                        .aspectRatio(aspectRatio, contentMode: .fit)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: optimalHeight)
                         .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg))
                         .designShadow(DesignSystem.Shadows.medium)
                         .overlay(alignment: .topTrailing) {
@@ -194,7 +198,8 @@ struct AnalysisDetailView: View {
             } else {
                 RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg)
                     .fill(DesignSystem.Colors.backgroundSecondary)
-                    .frame(height: 300)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 280) // Altura padrão
                     .overlay {
                         VStack(spacing: 8) {
                             Image(systemName: "photo")
@@ -208,6 +213,27 @@ struct AnalysisDetailView: View {
                     }
                     .designShadow(DesignSystem.Shadows.small)
             }
+        }
+    }
+    
+    // MARK: - Helper Functions for Photo Layout
+    
+    private func calculateOptimalHeight(for aspectRatio: CGFloat) -> CGFloat {
+        let minHeight: CGFloat = 180
+        let maxHeight: CGFloat = 400
+        let targetHeight: CGFloat = 280
+        
+        // Se a imagem é muito larga (panorâmica), reduz a altura
+        if aspectRatio > 2.0 {
+            return max(minHeight, targetHeight * 0.6)
+        }
+        // Se a imagem é muito alta (portrait), aumenta a altura
+        else if aspectRatio < 0.75 {
+            return min(maxHeight, targetHeight * 1.3)
+        }
+        // Para aspect ratios normais, usa a altura padrão
+        else {
+            return targetHeight
         }
     }
     

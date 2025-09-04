@@ -121,6 +121,10 @@ struct AnalysisListCell: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(CardButtonStyle())
+        .transition(.asymmetric(
+            insertion: .opacity.combined(with: .scale(scale: 0.95)).combined(with: .move(edge: .top)),
+            removal: .opacity.combined(with: .scale(scale: 0.95)).combined(with: .move(edge: .leading))
+        ))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityDescription)
         .accessibilityHint("Toque para ver detalhes da análise")

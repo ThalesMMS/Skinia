@@ -103,6 +103,7 @@ struct AnalysisListView: View {
                 }
             }
             .refreshable {
+                HapticManager.shared.impact(.light)
                 await viewModel.refreshPhotos()
             }
             .searchable(
@@ -271,6 +272,8 @@ struct AnalysisListView: View {
             }
         }
         .listStyle(InsetGroupedListStyle())
+        .animation(DesignSystem.Animations.gentle, value: viewModel.photos)
+        .animation(DesignSystem.Animations.gentle, value: viewModel.photosNeedingAttention)
     }
     
     // MARK: - Helper Functions

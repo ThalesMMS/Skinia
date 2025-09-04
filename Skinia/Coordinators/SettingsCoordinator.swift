@@ -24,28 +24,7 @@ final class SettingsCoordinator: NavigationCoordinator, ObservableObject {
             get: { self.navigationPath },
             set: { self.navigationPath = $0 }
         )) {
-            SettingsPlaceholderView()
+            SettingsView()
         }
-    }
-}
-
-private struct SettingsPlaceholderView: View {
-    var body: some View {
-        VStack(spacing: 20) {
-            Image(systemName: "gear")
-                .font(.system(size: 80))
-                .foregroundColor(.gray)
-            
-            Text("Configurações")
-                .font(.title)
-                .fontWeight(.semibold)
-            
-            Text("Interface de configurações será implementada na Fase 5")
-                .font(.body)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal)
-        }
-        .navigationTitle("Configurações")
     }
 }

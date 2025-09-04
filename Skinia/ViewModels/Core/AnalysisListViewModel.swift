@@ -46,6 +46,11 @@ final class AnalysisListViewModel {
     
     func refreshPhotos() async {
         await Task { @MainActor in
+            isLoading = true
+            
+            // Add a small delay to make the refresh feel more natural
+            try? await Task.sleep(nanoseconds: 300_000_000) // 0.3 seconds
+            
             loadPhotos()
         }.value
     }
