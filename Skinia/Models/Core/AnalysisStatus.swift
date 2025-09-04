@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 enum AnalysisStatus: String, CaseIterable, Codable {
     case pending = "pending"           // Aguardando envio
@@ -72,16 +73,16 @@ enum RiskLevel: String, CaseIterable, Codable {
         }
     }
     
-    var color: String {
+    var color: Color {
         switch self {
         case .low:
-            return "green"
+            return .green
         case .moderate:
-            return "yellow"
+            return .yellow
         case .high:
-            return "orange"
+            return .orange
         case .urgent:
-            return "red"
+            return .red
         }
     }
     

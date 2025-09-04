@@ -34,7 +34,8 @@ extension Coordinator {
     }
 }
 
-protocol NavigationCoordinator: Coordinator {
+@MainActor
+protocol NavigationCoordinator: Coordinator where Self: ObservableObject {
     var navigationPath: NavigationPath { get set }
     
     func push<T: Hashable>(_ item: T)
@@ -58,6 +59,7 @@ extension NavigationCoordinator {
     }
 }
 
+@MainActor
 protocol TabCoordinator: Coordinator {
     var selectedTab: Int { get set }
     var tabCoordinators: [any Coordinator] { get }

@@ -2,62 +2,74 @@ import Foundation
 import SwiftUI
 
 @MainActor
-final class AppCoordinator: ObservableObject {
+final class AppCoordinator: TabCoordinator, ObservableObject {
     @Published var selectedTab: Int = 0
+    
+    var parent: (any Coordinator)?
+    var children: [any Coordinator] = []
+    var tabCoordinators: [any Coordinator] = []
     
     private let dependencyContainer: DependencyContainer
     
+    // Tab coordinators
+    private lazy var analysisListCoordinator = AnalysisListCoordinator(dependencyContainer: dependencyContainer)
+    private lazy var cameraCoordinator = CameraCoordinator(dependencyContainer: dependencyContainer)
+    private lazy var settingsCoordinator = SettingsCoordinator(dependencyContainer: dependencyContainer)
+    
     init(dependencyContainer: DependencyContainer) {
         self.dependencyContainer = dependencyContainer
+        setupTabCoordinators()
     }
     
     func start() {
-        // Inicialização será implementada quando necessário
+        tabCoordinators.forEach { coordinator in
+            addChild(coordinator)
+            coordinator.start()
+        }
+    }
+    
+    private func setupTabCoordinators() {
+        tabCoordinators = [
+            analysisListCoordinator,
+            cameraCoordinator,
+            settingsCoordinator
+        ]
     }
     
     @ViewBuilder
     func build() -> some View {
-        TabView {
+        TabView(selection: Binding(
+            get: { self.selectedTab },
+            set: { self.selectedTab = $0 }
+        )) {
             // Tab 1: Análises (Lista principal)
-            PlaceholderView(title: "Análises")
+            analysisListCoordinator.build()
                 .tabItem {
                     Image(systemName: "photo.stack")
                     Text("Análises")
                 }
+                .tag(0)
             
             // Tab 2: Nova Foto (Captura)
-            PlaceholderView(title: "Nova Foto")
+            cameraCoordinator.build()
                 .tabItem {
                     Image(systemName: "plus")
                     Text("Nova Foto")
                 }
+                .tag(1)
             
             // Tab 3: Configurações
-            PlaceholderView(title: "Configurações")
+            settingsCoordinator.build()
                 .tabItem {
                     Image(systemName: "gear")
                     Text("Configurações")
                 }
+                .tag(2)
         }
-    }
-}
-
-private struct PlaceholderView: View {
-    let title: String
-    
-    var body: some View {
-        VStack {
-            Image(systemName: "app.fill")
-                .font(.system(size: 60))
-                .foregroundColor(.gray)
-            
-            Text(title)
-                .font(.title)
-                .foregroundColor(.primary)
-            
-            Text("Em breve...")
-                .font(.body)
-                .foregroundColor(.secondary)
-        }
+        .environment(\.analysisService, dependencyContainer.analysisService)
+        .environment(\.notificationManager, dependencyContainer.notificationManager)
+        .overlay(
+            NotificationOverlay()
+        )
     }
 }
