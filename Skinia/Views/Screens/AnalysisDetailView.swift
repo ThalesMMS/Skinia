@@ -6,49 +6,141 @@ struct AnalysisDetailView: View {
     @Environment(\.notificationManager) private var notificationManager
     @State private var showingShareSheet = false
     @State private var isRetryingAnalysis = false
+    @State private var showingFullScreenImage = false
+    @State private var showingPatientInfo = false
     
     init(photo: SkinLesionPhoto) {
         self.photo = photo
+        print("🔍 AnalysisDetailView init for photo: \(photo.id)")
     }
     
     var body: some View {
-        ScrollView {
-            VStack(spacing: 24) {
-                // Photo section
+        let _ = print("🔍 AnalysisDetailView body rendering for photo: \(photo.id)")
+        
+        return ScrollView {
+            LazyVStack(alignment: .leading, spacing: DesignSystem.Spacing.lg) {
+                // Photo section - main image
                 photoSection
+                    .id("photo-section")
                 
                 // Status section
                 statusSection
+                    .id("status-section")
                 
-                // Progress indicator for ongoing analysis
-                if photo.analysisStatus == .uploading || photo.analysisStatus == .analyzing {
-                    AnalysisProgressIndicator(photo: photo, analysisService: analysisService)
-                }
+                // Patient info section
+                patientInfoSection
+                    .id("patient-section")
                 
-                // Results section
-                if let result = photo.analysisResult {
-                    analysisResultSection(result)
-                    riskAssessmentSection(result)
-                    recommendationsSection(result)
-                }
-                
-                // Actions section
-                actionsSection
-                
-                // Metadata section
-                if let metadata = photo.metadata {
-                    metadataSection(metadata)
+                // Analysis result or progress
+                Group {
+                    if let result = photo.analysisResult {
+                        VStack(spacing: DesignSystem.Spacing.lg) {
+                            analysisResultSection(result)
+                            riskAssessmentSection(result)
+                            recommendationsSection(result)
+                        }
+                        .id("result-section")
+                    } else if photo.analysisStatus == .uploading || photo.analysisStatus == .analyzing {
+                        // Simple progress view instead of full AnalysisProgressView
+                        VStack(spacing: DesignSystem.Spacing.md) {
+                            Text("Análise em Progresso")
+                                .font(DesignSystem.Typography.headline)
+                            
+                            ProgressView(photo.analysisStatus.displayName)
+                                .progressViewStyle(CircularProgressViewStyle())
+                            
+                            Text("Aguarde enquanto processamos sua imagem...")
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(DesignSystem.Spacing.lg)
+                        .cardStyle()
+                        .id("progress-section")
+                    } else if photo.analysisStatus == .failed {
+                        // Simple error view
+                        VStack(spacing: DesignSystem.Spacing.md) {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(DesignSystem.Colors.error)
+                            
+                            Text("Erro na Análise")
+                                .font(DesignSystem.Typography.headline)
+                            
+                            Text("Não foi possível processar a análise da imagem.")
+                                .font(DesignSystem.Typography.body)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
+                                .multilineTextAlignment(.center)
+                            
+                            Button(action: retryAnalysis) {
+                                HStack {
+                                    if isRetryingAnalysis {
+                                        ProgressView()
+                                            .scaleEffect(0.8)
+                                    } else {
+                                        Image(systemName: "arrow.clockwise")
+                                    }
+                                    Text("Tentar Novamente")
+                                }
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(DesignSystem.Colors.primary)
+                                .foregroundColor(.white)
+                                .cornerRadius(DesignSystem.CornerRadius.lg)
+                            }
+                            .disabled(isRetryingAnalysis)
+                        }
+                        .padding(DesignSystem.Spacing.lg)
+                        .cardStyle()
+                        .id("error-section")
+                    } else {
+                        // Simple waiting view
+                        VStack(spacing: DesignSystem.Spacing.md) {
+                            Image(systemName: "clock.fill")
+                                .font(.system(size: 40))
+                                .foregroundColor(DesignSystem.Colors.textTertiary)
+                            
+                            Text("Aguardando Análise")
+                                .font(DesignSystem.Typography.headline)
+                            
+                            Text("A análise será iniciada em breve.")
+                                .font(DesignSystem.Typography.body)
+                                .foregroundColor(DesignSystem.Colors.textSecondary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .padding(DesignSystem.Spacing.lg)
+                        .cardStyle()
+                        .id("waiting-section")
+                    }
                 }
                 
                 // User notes section
                 userNotesSection
+                    .id("notes-section")
+                
+                // Metadata section  
+                if let metadata = photo.metadata {
+                    metadataSection(metadata)
+                        .id("metadata-section")
+                }
+                
+                // Actions section
+                actionsSection
+                    .id("actions-section")
             }
-            .padding()
+            .padding(DesignSystem.Spacing.lg)
         }
+        .background(DesignSystem.Colors.background)
         .navigationTitle("Análise Dermatológica")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
+            ToolbarItemGroup(placement: .navigationBarTrailing) {
+                Button {
+                    showingPatientInfo.toggle()
+                } label: {
+                    Image(systemName: "person.circle")
+                }
+                
                 Button("Compartilhar") {
                     showingShareSheet = true
                 }
@@ -60,26 +152,61 @@ struct AnalysisDetailView: View {
                 ShareSheet(photo: photo, result: result)
             }
         }
+        .sheet(isPresented: $showingPatientInfo) {
+            PatientInfoSheet(photo: photo)
+        }
+        .fullScreenCover(isPresented: $showingFullScreenImage) {
+            FullScreenImageView(photo: photo)
+        }
     }
     
     private var photoSection: some View {
-        VStack(spacing: 12) {
+        let _ = print("🔍 PhotoSection rendering - has image: \(photo.fullImage != nil)")
+        
+        return VStack(spacing: DesignSystem.Spacing.md) {
             if let image = photo.fullImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(height: 300)
-                    .clipped()
-                    .cornerRadius(12)
+                Button {
+                    showingFullScreenImage = true
+                    HapticManager.shared.impact(.light)
+                } label: {
+                    Image(uiImage: image)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(height: 300)
+                        .clipped()
+                        .clipShape(RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg))
+                        .designShadow(DesignSystem.Shadows.medium)
+                        .overlay(alignment: .topTrailing) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "viewfinder")
+                                    .font(.caption2)
+                                Text("Tocar para ampliar")
+                                    .font(.caption2)
+                            }
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(.ultraThinMaterial)
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                            .padding(8)
+                        }
+                }
+                .buttonStyle(PlainButtonStyle())
             } else {
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.gray.opacity(0.3))
+                RoundedRectangle(cornerRadius: DesignSystem.CornerRadius.lg)
+                    .fill(DesignSystem.Colors.backgroundSecondary)
                     .frame(height: 300)
                     .overlay {
-                        Image(systemName: "photo")
-                            .font(.system(size: 40))
-                            .foregroundColor(.gray)
+                        VStack(spacing: 8) {
+                            Image(systemName: "photo")
+                                .font(.system(size: 40, weight: .light))
+                                .foregroundColor(DesignSystem.Colors.textTertiary)
+                            
+                            Text("Imagem não disponível")
+                                .font(DesignSystem.Typography.caption)
+                                .foregroundColor(DesignSystem.Colors.textTertiary)
+                        }
                     }
+                    .designShadow(DesignSystem.Shadows.small)
             }
         }
     }
@@ -475,6 +602,219 @@ struct AnalysisDetailView: View {
             message: "Imagem salva na galeria com sucesso",
             type: .success
         )
+    }
+    
+    // MARK: - New Sections
+    
+    private var patientInfoSection: some View {
+        Group {
+            if let bodyLocation = photo.metadata?.bodyLocation {
+                HStack {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("Local da Lesão")
+                            .font(DesignSystem.Typography.medicalCaption)
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
+                        Text(bodyLocation)
+                            .font(DesignSystem.Typography.headline)
+                            .foregroundColor(DesignSystem.Colors.text)
+                    }
+                    
+                    Spacer()
+                    
+                    VStack(alignment: .trailing, spacing: 4) {
+                        Text("Data da Captura")
+                            .font(DesignSystem.Typography.medicalCaption)
+                            .foregroundColor(DesignSystem.Colors.textSecondary)
+                        Text(photo.formattedCaptureDate)
+                            .font(DesignSystem.Typography.headline)
+                            .foregroundColor(DesignSystem.Colors.text)
+                    }
+                }
+                .padding(DesignSystem.Spacing.md)
+                .cardStyle()
+            }
+        }
+    }
+}
+
+// MARK: - Supporting Views
+
+struct FullScreenImageView: View {
+    let photo: SkinLesionPhoto
+    @Environment(\.dismiss) private var dismiss
+    @State private var scale: CGFloat = 1.0
+    @State private var offset: CGSize = .zero
+    @State private var lastScaleValue: CGFloat = 1.0
+    
+    var body: some View {
+        ZStack {
+            Color.black
+                .ignoresSafeArea()
+            
+            if let image = photo.fullImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .scaleEffect(scale)
+                    .offset(offset)
+                    .gesture(
+                        MagnificationGesture()
+                            .onChanged { value in
+                                let delta = value / lastScaleValue
+                                lastScaleValue = value
+                                scale = min(max(scale * delta, 0.5), 3.0)
+                            }
+                            .onEnded { value in
+                                lastScaleValue = 1.0
+                                if scale < 1.0 {
+                                    withAnimation(.spring()) {
+                                        scale = 1.0
+                                        offset = .zero
+                                    }
+                                }
+                            }
+                            .simultaneously(with:
+                                DragGesture()
+                                    .onChanged { value in
+                                        offset = value.translation
+                                    }
+                                    .onEnded { value in
+                                        withAnimation(.spring()) {
+                                            offset = .zero
+                                        }
+                                    }
+                            )
+                    )
+                    .onTapGesture(count: 2) {
+                        withAnimation(.spring()) {
+                            if scale > 1.0 {
+                                scale = 1.0
+                                offset = .zero
+                            } else {
+                                scale = 2.0
+                            }
+                        }
+                    }
+            }
+            
+            VStack {
+                HStack {
+                    Button {
+                        dismiss()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.title)
+                            .foregroundColor(.white)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
+                    
+                    Spacer()
+                }
+                .padding()
+                
+                Spacer()
+            }
+        }
+        .gesture(
+            TapGesture()
+                .onEnded {
+                    dismiss()
+                }
+        )
+    }
+}
+
+struct PatientInfoSheet: View {
+    let photo: SkinLesionPhoto
+    @Environment(\.dismiss) private var dismiss
+    
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(spacing: DesignSystem.Spacing.lg) {
+                    // Patient header
+                    VStack(spacing: DesignSystem.Spacing.sm) {
+                        Image(systemName: "person.crop.circle")
+                            .font(.system(size: 60))
+                            .foregroundColor(DesignSystem.Colors.primary)
+                        
+                        Text("Informações do Paciente")
+                            .font(DesignSystem.Typography.title2)
+                            .fontWeight(.bold)
+                    }
+                    .padding(.top, DesignSystem.Spacing.lg)
+                    
+                    // Analysis info
+                    VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
+                        infoCard(
+                            title: "Data da Análise",
+                            value: photo.formattedCaptureDate,
+                            icon: "calendar"
+                        )
+                        
+                        if let bodyLocation = photo.metadata?.bodyLocation {
+                            infoCard(
+                                title: "Local da Lesão",
+                                value: bodyLocation,
+                                icon: "figure.walk"
+                            )
+                        }
+                        
+                        infoCard(
+                            title: "Status da Análise",
+                            value: photo.analysisStatus.displayName,
+                            icon: "stethoscope"
+                        )
+                        
+                        if let notes = photo.userNotes, !notes.isEmpty {
+                            infoCard(
+                                title: "Observações",
+                                value: notes,
+                                icon: "note.text",
+                                isMultiline: true
+                            )
+                        }
+                    }
+                    
+                    Spacer()
+                }
+                .padding(DesignSystem.Spacing.lg)
+            }
+            .navigationTitle("Paciente")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Fechar") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+    }
+    
+    private func infoCard(title: String, value: String, icon: String, isMultiline: Bool = false) -> some View {
+        HStack(alignment: .top, spacing: DesignSystem.Spacing.md) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(DesignSystem.Colors.primary)
+                .frame(width: 24, alignment: .center)
+            
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(DesignSystem.Typography.medicalCaption)
+                    .foregroundColor(DesignSystem.Colors.textSecondary)
+                
+                Text(value)
+                    .font(DesignSystem.Typography.body)
+                    .foregroundColor(DesignSystem.Colors.text)
+                    .lineLimit(isMultiline ? nil : 1)
+            }
+            
+            Spacer()
+        }
+        .padding(DesignSystem.Spacing.md)
+        .cardStyle()
     }
 }
 

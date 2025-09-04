@@ -7,7 +7,11 @@ struct AnalysisListCell: View {
     @Environment(\.analysisService) private var analysisService
     
     var body: some View {
-        Button(action: onTap) {
+        Button(action: {
+            print("🔘 Card tapped for photo: \(photo.id)")
+            HapticManager.shared.impact(.light)
+            onTap()
+        }) {
             VStack(spacing: DesignSystem.Spacing.md) {
                 // Header with title and date
                 HStack(alignment: .top) {
@@ -116,7 +120,7 @@ struct AnalysisListCell: View {
             .designShadow(DesignSystem.Shadows.card)
             .contentShape(Rectangle())
         }
-        .buttonStyle(PlainButtonStyle())
+        .buttonStyle(CardButtonStyle())
         .accessibilityElement(children: .combine)
         .accessibilityLabel(accessibilityDescription)
         .accessibilityHint("Toque para ver detalhes da análise")
@@ -318,6 +322,16 @@ private struct AsyncImage<Content: View, Placeholder: View>: View {
         } else {
             placeholder()
         }
+    }
+}
+
+// MARK: - Card Button Style
+
+struct CardButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.98 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 

@@ -1,5 +1,22 @@
 import SwiftUI
 
+class SheetState: ObservableObject {
+    @Published var selectedPhoto: SkinLesionPhoto?
+    @Published var isShowing: Bool = false
+    
+    func showSheet(with photo: SkinLesionPhoto) {
+        print("🔍 SheetState: Setting photo \(photo.id) and showing sheet")
+        selectedPhoto = photo
+        isShowing = true
+    }
+    
+    func hideSheet() {
+        print("🔍 SheetState: Hiding sheet and clearing photo")
+        isShowing = false
+        selectedPhoto = nil
+    }
+}
+
 struct AnalysisListView: View {
     @State private var viewModel: AnalysisListViewModel
     @StateObject private var coordinator: AnalysisListCoordinator
@@ -9,6 +26,7 @@ struct AnalysisListView: View {
     @State private var showingHistoryOptions = false
     @State private var showingBatchActions = false
     @State private var selectedPhotos = Set<UUID>()
+    @StateObject private var sheetState = SheetState()
     
     init(coordinator: AnalysisListCoordinator) {
         self._coordinator = StateObject(wrappedValue: coordinator)
@@ -111,6 +129,41 @@ struct AnalysisListView: View {
         .onAppear {
             viewModel.loadMockData() // For development - will be replaced with real data loading
         }
+        .sheet(isPresented: $sheetState.isShowing) {
+            let _ = print("🔍 Sheet building - isShowing: \(sheetState.isShowing), selectedPhoto: \(sheetState.selectedPhoto?.id.uuidString ?? "nil")")
+            
+            if let photoToShow = sheetState.selectedPhoto {
+                let _ = print("🔍 Sheet presenting AnalysisDetailView for photo: \(photoToShow.id)")
+                NavigationView {
+                    AnalysisDetailView(photo: photoToShow)
+                        .navigationBarTitleDisplayMode(.inline)
+                        .toolbar {
+                            ToolbarItem(placement: .navigationBarLeading) {
+                                Button("Fechar") {
+                                    print("🔍 Closing sheet")
+                                    sheetState.hideSheet()
+                                }
+                            }
+                        }
+                        .onAppear {
+                            print("🔍 Sheet AnalysisDetailView appeared for photo: \(photoToShow.id)")
+                        }
+                }
+                .navigationViewStyle(StackNavigationViewStyle())
+                .environment(\.analysisService, coordinator.dependencyContainer.analysisService)
+                .environment(\.notificationManager, coordinator.dependencyContainer.notificationManager)
+            } else {
+                let _ = print("🔍 Sheet presenting but selectedPhoto is nil - creating placeholder")
+                VStack {
+                    Text("Error: Photo not found")
+                        .foregroundColor(.red)
+                    Button("Close") {
+                        sheetState.hideSheet()
+                    }
+                }
+                .padding()
+            }
+        }
     }
     
     private var photosList: some View {
@@ -132,7 +185,8 @@ struct AnalysisListView: View {
                             
                             AnalysisListCell(photo: photo) {
                                 if selectedPhotos.isEmpty {
-                                    coordinator.showAnalysisDetail(for: photo)
+                                    print("🔍 Card tapped - showing detail for photo: \(photo.id)")
+                                    sheetState.showSheet(with: photo)
                                 } else {
                                     toggleSelection(for: photo.id)
                                 }
@@ -166,7 +220,8 @@ struct AnalysisListView: View {
                         
                         AnalysisListCell(photo: photo) {
                             if selectedPhotos.isEmpty {
-                                coordinator.showAnalysisDetail(for: photo)
+                                print("🔍 Card tapped - showing detail for photo: \(photo.id)")
+                                sheetState.showSheet(with: photo)
                             } else {
                                 toggleSelection(for: photo.id)
                             }

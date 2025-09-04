@@ -20,20 +20,13 @@ final class AnalysisListCoordinator: NavigationCoordinator, ObservableObject {
     
     @ViewBuilder
     func build() -> some View {
-        NavigationStack(path: Binding(
-            get: { self.navigationPath },
-            set: { self.navigationPath = $0 }
-        )) {
-            AnalysisListView(coordinator: self)
-                .navigationDestination(for: AnalysisDetailRoute.self) { route in
-                    AnalysisDetailView(photo: route.photo)
-                }
-        }
+        AnalysisListView(coordinator: self)
     }
     
     // MARK: - Navigation Methods
     func showAnalysisDetail(for photo: SkinLesionPhoto) {
-        push(AnalysisDetailRoute(photo: photo))
+        // This method is now handled directly in AnalysisListView
+        print("🔍 Navigation handled by AnalysisListView for photo: \(photo.id)")
     }
 }
 
