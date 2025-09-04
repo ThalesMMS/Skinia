@@ -84,7 +84,7 @@ struct TutorialDetailView: View {
                                     .font(.system(size: 14, weight: .medium))
                             }
                         }
-                        .foregroundColor(.white)
+                        .foregroundColor(DesignSystem.Colors.surface)
                     }
                     .frame(maxWidth: .infinity)
                     .primaryButtonStyle()

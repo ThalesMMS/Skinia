@@ -516,7 +516,7 @@ private struct HistoryOptionsSheet: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(DesignSystem.Colors.backgroundSecondary)
                 .cornerRadius(12)
             }
         }
@@ -552,7 +552,7 @@ private struct HistoryOptionsSheet: View {
                     }
                 }
                 .padding()
-                .background(Color(.systemGray6))
+                .background(DesignSystem.Colors.backgroundSecondary)
                 .cornerRadius(12)
             } else {
                 Text("Nenhuma análise concluída disponível")
@@ -583,7 +583,7 @@ private struct HistoryOptionsSheet: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color(.systemGray6))
+                .background(DesignSystem.Colors.backgroundSecondary)
                 .foregroundColor(.primary)
                 .cornerRadius(12)
                 
@@ -592,7 +592,7 @@ private struct HistoryOptionsSheet: View {
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
-                .background(Color(.systemGray6))
+                .background(DesignSystem.Colors.backgroundSecondary)
                 .foregroundColor(.primary)
                 .cornerRadius(12)
             }
@@ -624,7 +624,7 @@ private struct StatCard: View {
         }
         .frame(maxWidth: .infinity)
         .padding()
-        .background(Color(.systemBackground))
+        .background(DesignSystem.Colors.surface)
         .cornerRadius(12)
         .overlay(
             RoundedRectangle(cornerRadius: 12)

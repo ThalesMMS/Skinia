@@ -85,7 +85,7 @@ struct AnalysisDetailView: View {
                                 .frame(maxWidth: .infinity)
                                 .padding()
                                 .background(DesignSystem.Colors.primary)
-                                .foregroundColor(.white)
+                                .foregroundColor(DesignSystem.Colors.surface)
                                 .cornerRadius(DesignSystem.CornerRadius.lg)
                             }
                             .disabled(isRetryingAnalysis)
@@ -166,7 +166,8 @@ struct AnalysisDetailView: View {
         
         return Group {
             if let image = photo.fullImage {
-                let aspectRatio = image.size.width / image.size.height
+                // Safely calculate aspect ratio to prevent NaN errors
+                let aspectRatio = safeAspectRatio(from: image.size)
                 let optimalHeight = calculateOptimalHeight(for: aspectRatio)
                 
                 Button {
@@ -218,10 +219,37 @@ struct AnalysisDetailView: View {
     
     // MARK: - Helper Functions for Photo Layout
     
+    private func safeAspectRatio(from size: CGSize) -> CGFloat {
+        // Prevent division by zero and invalid values
+        guard size.width > 0, size.height > 0, 
+              size.width.isFinite, size.height.isFinite,
+              !size.width.isNaN, !size.height.isNaN else {
+            print("⚠️ Invalid image size detected: \(size), using default aspect ratio")
+            return 1.0 // Default square aspect ratio
+        }
+        
+        let ratio = size.width / size.height
+        
+        // Ensure the calculated ratio is valid
+        guard ratio.isFinite, !ratio.isNaN, ratio > 0 else {
+            print("⚠️ Invalid aspect ratio calculated: \(ratio), using default")
+            return 1.0
+        }
+        
+        // Clamp extreme ratios to reasonable bounds
+        return min(max(ratio, 0.2), 5.0) // Allow ratios between 1:5 and 5:1
+    }
+    
     private func calculateOptimalHeight(for aspectRatio: CGFloat) -> CGFloat {
         let minHeight: CGFloat = 180
         let maxHeight: CGFloat = 400
         let targetHeight: CGFloat = 280
+        
+        // Ensure aspectRatio is valid before calculations
+        guard aspectRatio.isFinite, !aspectRatio.isNaN, aspectRatio > 0 else {
+            print("⚠️ Invalid aspect ratio in calculateOptimalHeight: \(aspectRatio)")
+            return targetHeight
+        }
         
         // Se a imagem é muito larga (panorâmica), reduz a altura
         if aspectRatio > 2.0 {
@@ -248,7 +276,7 @@ struct AnalysisDetailView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(DesignSystem.Colors.backgroundSecondary)
         .cornerRadius(12)
     }
     
@@ -335,7 +363,7 @@ struct AnalysisDetailView: View {
             }
         }
         .padding()
-        .background(Color(.systemGray6))
+        .background(DesignSystem.Colors.backgroundSecondary)
         .cornerRadius(12)
     }
     
@@ -478,7 +506,7 @@ struct AnalysisDetailView: View {
                         .frame(maxWidth: .infinity)
                         .padding()
                         .background(Color.blue)
-                        .foregroundColor(.white)
+                        .foregroundColor(DesignSystem.Colors.surface)
                         .cornerRadius(12)
                     }
                     .disabled(isRetryingAnalysis)
@@ -491,7 +519,7 @@ struct AnalysisDetailView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(DesignSystem.Colors.backgroundSecondary)
                     .foregroundColor(.primary)
                     .cornerRadius(12)
                 }
@@ -503,7 +531,7 @@ struct AnalysisDetailView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color(.systemGray6))
+                    .background(DesignSystem.Colors.backgroundSecondary)
                     .foregroundColor(.primary)
                     .cornerRadius(12)
                 }
@@ -511,7 +539,7 @@ struct AnalysisDetailView: View {
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 16)
-        .background(Color(.systemGray6))
+        .background(DesignSystem.Colors.backgroundSecondary)
         .cornerRadius(16)
     }
     
@@ -535,7 +563,7 @@ struct AnalysisDetailView: View {
         }
         .padding(.vertical, 16)
         .padding(.horizontal, 16)
-        .background(Color(.systemGray6))
+        .background(DesignSystem.Colors.backgroundSecondary)
         .cornerRadius(16)
     }
     
@@ -730,7 +758,7 @@ struct FullScreenImageView: View {
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.title)
-                            .foregroundColor(.white)
+                            .foregroundColor(DesignSystem.Colors.surface)
                             .background(.ultraThinMaterial, in: Circle())
                     }
                     

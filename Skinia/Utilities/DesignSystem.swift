@@ -6,38 +6,38 @@ struct DesignSystem {
     
     // MARK: - Color System
     struct Colors {
-        // Primary Brand Colors
-        static let primary = Color(red: 0.0, green: 0.48, blue: 0.8) // Medical Blue
-        static let primaryLight = Color(red: 0.85, green: 0.93, blue: 1.0)
-        static let primaryDark = Color(red: 0.0, green: 0.36, blue: 0.6)
+        // Primary Brand Colors (Support light/dark mode)
+        static let primary = Color(.systemBlue)
+        static let primaryLight = Color(.systemBlue).opacity(0.15)
+        static let primaryDark = Color(.systemBlue)
         
         // Secondary Colors
-        static let secondary = Color(red: 0.98, green: 0.45, blue: 0.26) // Medical Orange
-        static let secondaryLight = Color(red: 1.0, green: 0.95, blue: 0.92)
-        static let secondaryDark = Color(red: 0.8, green: 0.36, blue: 0.21)
+        static let secondary = Color(.systemOrange)
+        static let secondaryLight = Color(.systemOrange).opacity(0.15)
+        static let secondaryDark = Color(.systemOrange)
         
-        // Status Colors
-        static let success = Color(red: 0.0, green: 0.7, blue: 0.42)
-        static let successLight = Color(red: 0.9, green: 0.98, blue: 0.94)
-        static let warning = Color(red: 1.0, green: 0.75, blue: 0.0)
-        static let warningLight = Color(red: 1.0, green: 0.98, blue: 0.9)
-        static let error = Color(red: 0.9, green: 0.26, blue: 0.21)
-        static let errorLight = Color(red: 1.0, green: 0.95, blue: 0.95)
-        static let info = Color(red: 0.13, green: 0.58, blue: 0.95)
-        static let infoLight = Color(red: 0.93, green: 0.97, blue: 1.0)
+        // Status Colors (Better dark mode support)
+        static let success = Color(.systemGreen)
+        static let successLight = Color(.systemGreen).opacity(0.15)
+        static let warning = Color(.systemYellow)
+        static let warningLight = Color(.systemYellow).opacity(0.15)
+        static let error = Color(.systemRed)
+        static let errorLight = Color(.systemRed).opacity(0.15)
+        static let info = Color(.systemBlue)
+        static let infoLight = Color(.systemBlue).opacity(0.15)
         
-        // Neutral Colors
-        static let text = Color(red: 0.11, green: 0.11, blue: 0.13)
-        static let textSecondary = Color(red: 0.44, green: 0.44, blue: 0.46)
-        static let textTertiary = Color(red: 0.68, green: 0.68, blue: 0.7)
+        // Adaptive Neutral Colors
+        static let text = Color(.label)
+        static let textSecondary = Color(.secondaryLabel)
+        static let textTertiary = Color(.tertiaryLabel)
         
-        static let background = Color(red: 0.98, green: 0.98, blue: 0.99)
-        static let backgroundSecondary = Color(red: 0.95, green: 0.95, blue: 0.97)
-        static let surface = Color.white
-        static let surfaceSecondary = Color(red: 0.98, green: 0.98, blue: 0.99)
+        static let background = Color(.systemBackground)
+        static let backgroundSecondary = Color(.secondarySystemBackground)
+        static let surface = Color(.systemBackground)
+        static let surfaceSecondary = Color(.secondarySystemBackground)
         
-        static let border = Color(red: 0.89, green: 0.89, blue: 0.92)
-        static let borderLight = Color(red: 0.95, green: 0.95, blue: 0.97)
+        static let border = Color(.separator)
+        static let borderLight = Color(.separator).opacity(0.5)
         
         // Risk Level Colors (Enhanced)
         static let riskLow = success
@@ -200,7 +200,7 @@ extension View {
         self
             .frame(minHeight: DesignSystem.Spacing.buttonHeight)
             .background(DesignSystem.Colors.primary)
-            .foregroundColor(.white)
+            .foregroundColor(Color(.systemBackground))
             .font(DesignSystem.Typography.headline)
             .cornerRadius(DesignSystem.CornerRadius.button)
             .designShadow(DesignSystem.Shadows.small)
