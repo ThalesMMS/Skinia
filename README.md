@@ -1,118 +1,157 @@
-# Skinia 📱
+# Skinia 🔬
 
-> Aplicativo iOS para análise inteligente de lesões de pele
+**Aplicativo iOS para análise dermatológica de lesões cutâneas usando IA**
 
-Skinia é um aplicativo iOS desenvolvido em SwiftUI que permite aos usuários capturar fotos de lesões de pele e receber análises baseadas em inteligência artificial para auxiliar na detecção precoce de condições dermatológicas, incluindo possíveis casos de câncer de pele.
+Skinia é um aplicativo médico para iPhone que permite fotografar lesões de pele e obter análises automáticas usando tecnologia de inteligência artificial, auxiliando na detecção precoce de condições dermatológicas.
 
-## 🎯 Funcionalidades Principais
+## 📱 Funcionalidades Principais
 
-- **📸 Captura de Fotos**: Interface intuitiva para fotografar lesões de pele
-- **🤖 Análise por IA**: Upload seguro para servidor remoto com processamento inteligente
-- **📊 Resultados Detalhados**: Relatórios com nível de confiança, tipo de lesão e recomendações
-- **📝 Histórico**: Lista organizada de todas as análises com status em tempo real
-- **🔒 Privacidade**: Dados protegidos e controle total sobre suas informações
+### ✅ **Já Implementado**
+- **📸 Lista de Análises**: Visualização de todas as fotos analisadas
+- **🔍 Detalhes da Análise**: Visualização completa dos resultados
+- **🎨 Design System Médico**: Interface profissional adaptada para uso clínico
+- **♿ Acessibilidade Completa**: Suporte total ao VoiceOver e navegação assistiva
+- **📊 Estados de Loading**: Animações elegantes durante processamento
+- **🎯 Navegação Robusta**: Sistema de navegação modal otimizado
+- **📱 UI/UX Moderna**: Componentes animados e feedback háptico
 
-## 🏗️ Arquitetura
+### 🚧 **Em Desenvolvimento**
+- **📷 Captura de Fotos**: Interface de câmera otimizada para dermatologia
+- **🤖 Análise IA**: Integração com serviços de machine learning
+- **⚙️ Configurações**: Preferências e configurações do usuário
+- **🔐 Privacidade**: Gerenciamento de dados e permissões
 
-- **Padrão**: MVVM-C (Model-View-ViewModel-Coordinator)
-- **UI Framework**: SwiftUI
-- **Persistência**: SwiftData
-- **Networking**: URLSession com async/await
-- **Testes**: Swift Testing + XCTest
+## 🏗️ Arquitetura Técnica
 
-## 📋 Requisitos
+### **Padrão MVVM-C (Model-View-ViewModel-Coordinator)**
+- **Models**: SwiftData para persistência local
+- **Views**: SwiftUI com componentes reutilizáveis  
+- **ViewModels**: Lógica de negócio e estado das telas
+- **Coordinators**: Navegação e fluxo da aplicação
 
-- **iOS**: 18.5+
-- **Xcode**: 16.4+
-- **Swift**: 5.0+
-- **Dispositivos**: iPhone e iPad (Universal)
-
-## 🚀 Como Executar
-
-1. Clone o repositório
-2. Abra `Skinia.xcodeproj` no Xcode
-3. Selecione o target desejado (simulador ou device)
-4. Execute o projeto (⌘+R)
-
-## 🧪 Testes
-
-### Testes Unitários
-```bash
-⌘+U no Xcode ou selecione o scheme SkiniaTests
-```
-
-### Testes de UI
-```bash
-Selecione o scheme SkiniaUITests no Xcode
-```
+### **Principais Tecnologias**
+- **iOS 18.5+** (SwiftUI, SwiftData)
+- **Design System** customizado para aplicações médicas
+- **Acessibilidade** nativa com VoiceOver
+- **Injeção de Dependência** protocol-based
+- **Mock System** para desenvolvimento e testes
 
 ## 📁 Estrutura do Projeto
 
 ```
 Skinia/
-├── Models/              # Modelos de dados SwiftData
-├── Views/               # Views SwiftUI
-├── ViewModels/          # Lógica de apresentação
-├── Coordinators/        # Navegação e fluxo
-├── Services/            # Serviços (rede, câmera, etc.)
-├── Utilities/           # Utilitários e extensions
-├── Resources/           # Assets, cores, strings
-└── Tests/              # Testes unitários e UI
+├── 📁 Models/              # Modelos de dados (SwiftData)
+│   ├── SkinLesionPhoto.swift
+│   ├── AnalysisResult.swift
+│   └── PhotoMetadata.swift
+├── 📁 Views/               # Interface do usuário
+│   ├── Screens/            # Telas principais
+│   ├── Components/         # Componentes reutilizáveis
+│   └── Analysis/           # Componentes específicos de análise
+├── 📁 ViewModels/          # Lógica de apresentação
+├── 📁 Coordinators/        # Navegação e fluxo
+├── 📁 Services/            # Serviços e APIs
+├── 📁 Utilities/           # Utilitários e helpers
+└── 📁 Resources/           # Assets e recursos
 ```
 
-## 🔄 Estados da Análise
+## 🎨 Design System
 
-- **🟡 Pendente**: Aguardando envio para o servidor
-- **🔄 Enviando**: Upload em progresso
-- **⏳ Analisando**: Processamento no servidor
-- **✅ Concluída**: Análise finalizada com resultados
-- **❌ Falhou**: Erro durante o processo
+### **Paleta de Cores Médica**
+- **Primary**: Azul profissional (`#007BA7`)
+- **Success**: Verde seguro (`#28A745`) 
+- **Warning**: Amarelo atenção (`#FFC107`)
+- **Error**: Vermelho urgência (`#DC3545`)
+- **Risk Colors**: Escala específica para níveis de risco
 
-## 🛡️ Privacidade e Segurança
+### **Componentes Únicos**
+- **StatusBadge**: Badges animados para status de análise
+- **RiskBadge**: Indicadores visuais de nível de risco
+- **LoadingDots**: Animação de carregamento elegante
+- **AnalysisListCell**: Células otimizadas para exibição de lesões
 
-- Todas as imagens são processadas de forma segura
-- Dados sensíveis são protegidos localmente
-- Comunicação criptografada com servidor
-- Controle total do usuário sobre seus dados
+## 🔬 Funcionalidades Médicas
 
-## 📈 Roadmap de Desenvolvimento
+### **Estados de Análise**
+- `pending` - Aguardando envio
+- `uploading` - Enviando para análise
+- `analyzing` - Processamento em andamento
+- `completed` - Análise concluída
+- `failed` - Erro no processamento
 
-O projeto está organizado em 10 fases principais:
+### **Níveis de Risco**
+- `low` - Risco baixo (verde)
+- `moderate` - Risco moderado (amarelo)
+- `high` - Risco alto (laranja)  
+- `urgent` - Atenção urgente (vermelho)
 
-1. **Fundação e Modelos** - Base arquitetural e modelos SwiftData
-2. **Interface Principal** - Lista de análises e navegação
-3. **Captura de Fotos** - Interface de câmera e galeria
-4. **Estados Visuais** - Loading, progresso e feedback
-5. **Configurações** - Preferências e privacidade
-6. **Polimento UI/UX** - Design system e animações
-7. **Funcionalidades de Rede** - Upload e API integration
-8. **Testes e Qualidade** - Cobertura completa de testes
-9. **Otimização** - Performance, segurança e acessibilidade
-10. **Produção** - Build final e documentação
+## 🛠️ Desenvolvimento
+
+### **Requisitos**
+- Xcode 15.0+
+- iOS 18.5+
+- Swift 5.9+
+
+### **Instalação**
+```bash
+git clone https://github.com/[usuario]/Skinia.git
+cd Skinia
+open Skinia.xcodeproj
+```
+
+### **Build e Teste**
+```bash
+# Build do projeto
+xcodebuild -project Skinia.xcodeproj -scheme Skinia build
+
+# Executar testes
+xcodebuild test -project Skinia.xcodeproj -scheme Skinia
+```
+
+### **Diretrizes para Claude Code**
+- **Não usar simulador**: Apenas builds para verificação
+- **Testes pelo usuário**: Screenshots são custosos
+- **Usar TodoWrite**: Para gerenciar tarefas complexas
+- **Seguir MVVM-C**: Manter arquitetura consistente
+
+## 📋 Status do Projeto
+
+### **Fases Concluídas**
+- ✅ **Fase 1**: Fundação e Modelos de Dados
+- ✅ **Fase 2**: Interface Principal e Navegação  
+- ✅ **Fase 6**: UI/UX Enhancement
+
+### **Próximas Fases**
+- 🚧 **Fase 3**: Captura de Fotos e Câmera
+- 📋 **Fase 4**: Análise de Fotos (Mock)
+- 📋 **Fase 5**: Configurações e Detalhes
+- 📋 **Fase 7**: Funcionalidades de Rede
+
+## 👨‍⚕️ Uso Médico
+
+⚠️ **Aviso Importante**: Este aplicativo é destinado para **uso auxiliar** em análises dermatológicas. Os resultados devem sempre ser interpretados por profissionais médicos qualificados. Não substitui consulta médica especializada.
 
 ## 🤝 Contribuição
 
 Este projeto segue as melhores práticas de desenvolvimento iOS:
 
 - Código limpo e bem documentado
+- SwiftUI + SwiftData como stack principal
 - Testes unitários obrigatórios
-- Code review em todas as mudanças
-- Semantic versioning
-- Conventional commits
-
-## ⚠️ Aviso Médico
-
-**Este aplicativo não substitui consulta médica profissional.** Os resultados fornecidos são apenas para fins informativos e educacionais. Sempre consulte um dermatologista qualificado para diagnóstico e tratamento adequados.
-
-## 📄 Licença
-
-[Definir licença apropriada]
+- Design system consistente
+- Acessibilidade em primeiro lugar
 
 ## 👥 Equipe
 
 - **Desenvolvedor**: Thales Matheus Mendonça Santos
-- **Organização**: [Definir organização]
+- **Assistente IA**: Claude Code (Anthropic)
+
+## 📄 Licença
+
+Este projeto está sob licença [MIT](LICENSE).
 
 ---
+
+**Desenvolvido com ❤️ para auxiliar profissionais da saúde na detecção precoce de condições dermatológicas**
 
 Para mais informações técnicas detalhadas, consulte o arquivo [CLAUDE.md](CLAUDE.md).
