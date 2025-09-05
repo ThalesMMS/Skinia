@@ -20,6 +20,8 @@ struct CameraScreen: View {
     @State private var patientID = ""
     @State private var showingPhotoPicker = false
     @State private var selectedPhotoItem: PhotosPickerItem?
+    @State private var isProcessingPhotoSelection = false
+    @State private var isLoadingPhoto = false
     
     init(coordinator: CameraCoordinator) {
         self._coordinator = StateObject(wrappedValue: coordinator)
@@ -78,7 +80,10 @@ struct CameraScreen: View {
                     },
                     onRetake: {
                         showingPreview = false
-                        showingCamera = true
+                        capturedImage = nil
+                        imageMetadata = nil
+                        selectedPhotoItem = nil
+                        // Don't automatically show camera when closing preview
                     }
                 )
             }
@@ -150,7 +155,13 @@ struct CameraScreen: View {
                     .onChange(of: selectedPhotoItem) { _, newItem in
                         Task {
                             if let newItem = newItem {
+                                isProcessingPhotoSelection = true
+                                isLoadingPhoto = true
                                 await loadPhotoFromLibrary(newItem)
+                                isProcessingPhotoSelection = false
+                                // Small delay to ensure smooth transition
+                                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                                isLoadingPhoto = false
                             }
                         }
                     }
@@ -180,7 +191,7 @@ struct CameraScreen: View {
         }
         .overlay(
             Group {
-                if isSaving {
+                if isSaving || isLoadingPhoto {
                     Color.black.opacity(0.3)
                         .overlay(
                             VStack(spacing: 16) {
@@ -188,7 +199,7 @@ struct CameraScreen: View {
                                     .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                     .scaleEffect(1.5)
                                 
-                                Text("Salvando foto...")
+                                Text(isLoadingPhoto ? "Processando foto..." : "Salvando foto...")
                                     .font(.headline)
                                     .foregroundColor(.white)
                             }
@@ -215,21 +226,57 @@ struct CameraScreen: View {
     
     private func loadPhotoFromLibrary(_ item: PhotosPickerItem) async {
         do {
-            guard let data = try await item.loadTransferable(type: Data.self),
-                  let image = UIImage(data: data) else {
-                print("Failed to load image from photo library")
+            // Load image data
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                print("Failed to load data from photo library")
+                await MainActor.run {
+                    isLoadingPhoto = false
+                }
                 return
             }
             
+            // Create image from data
+            guard let image = UIImage(data: data) else {
+                print("Failed to create image from data")
+                await MainActor.run {
+                    isLoadingPhoto = false
+                }
+                return
+            }
+            
+            // Resize image if it's too large to improve performance
+            let resizedImage = resizeImageIfNeeded(image)
+            
             await MainActor.run {
-                capturedImage = image
+                capturedImage = resizedImage
                 imageMetadata = nil // Photo library images don't have camera metadata
                 showingPreview = true
                 selectedPhotoItem = nil
             }
         } catch {
             print("Error loading photo from library: \(error)")
+            await MainActor.run {
+                isLoadingPhoto = false
+            }
         }
+    }
+    
+    private func resizeImageIfNeeded(_ image: UIImage) -> UIImage {
+        let maxSize: CGFloat = 2048
+        
+        guard image.size.width > maxSize || image.size.height > maxSize else {
+            return image
+        }
+        
+        let scale = min(maxSize / image.size.width, maxSize / image.size.height)
+        let newSize = CGSize(width: image.size.width * scale, height: image.size.height * scale)
+        
+        UIGraphicsBeginImageContextWithOptions(newSize, false, 1.0)
+        image.draw(in: CGRect(origin: .zero, size: newSize))
+        let resizedImage = UIGraphicsGetImageFromCurrentImageContext()
+        UIGraphicsEndImageContext()
+        
+        return resizedImage ?? image
     }
     
     private func savePhoto() async {

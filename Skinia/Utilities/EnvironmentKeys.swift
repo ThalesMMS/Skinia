@@ -2,7 +2,7 @@ import SwiftUI
 
 // MARK: - Analysis Service Environment Key
 
-private struct AnalysisServiceKey: EnvironmentKey {
+private struct AnalysisServiceKey: @preconcurrency EnvironmentKey {
     @MainActor static let defaultValue: any AnalysisServiceProtocol = MockAnalysisService()
 }
 

@@ -29,143 +29,138 @@ struct PhotoPreviewView: View {
     }
     
     var body: some View {
-        NavigationView {
-            VStack(spacing: 0) {
-                // Scrollable content including image and form
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // Image preview
+        VStack(spacing: 0) {
+            // Simple header
+            HStack {
+                Button("Cancelar") {
+                    onRetake()
+                }
+                
+                Spacer()
+                
+                Text("Nova Foto")
+                    .font(.headline)
+                
+                Spacer()
+                
+                Text("Cancelar")
+                    .opacity(0)
+            }
+            .padding()
+            
+            List {
+                Section {
+                    // Image preview
+                    HStack {
+                        Spacer()
                         Image(uiImage: image)
                             .resizable()
                             .aspectRatio(contentMode: .fit)
-                            .frame(maxHeight: UIScreen.main.bounds.height * 0.5)
-                            .clipped()
-                            .cornerRadius(12)
-                            .padding(.horizontal)
-                        // Patient Information Section
-                        VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
-                            Text("Informações do Paciente")
-                                .font(DesignSystem.Typography.headline)
-                                .foregroundColor(DesignSystem.Colors.text)
-                            
-                            VStack(spacing: DesignSystem.Spacing.sm) {
-                                // Patient Name Field
-                                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
-                                    Text("Nome do Paciente")
-                                        .font(DesignSystem.Typography.medicalCaption)
-                                        .foregroundColor(DesignSystem.Colors.textSecondary)
-                                    
-                                    TextField("Digite o nome completo", text: $patientName)
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                        .font(DesignSystem.Typography.body)
-                                }
-                                
-                                // Patient ID Field
-                                VStack(alignment: .leading, spacing: DesignSystem.Spacing.xs) {
-                                    Text("ID/Registro do Paciente")
-                                        .font(DesignSystem.Typography.medicalCaption)
-                                        .foregroundColor(DesignSystem.Colors.textSecondary)
-                                    
-                                    TextField("Ex: 12345 ou RG123456", text: $patientID)
-                                        .textFieldStyle(RoundedBorderTextFieldStyle())
-                                        .font(DesignSystem.Typography.body)
-                                }
-                                
-                                // Validation message
-                                if patientName.isEmpty && patientID.isEmpty {
-                                    HStack {
-                                        Image(systemName: "info.circle")
-                                            .foregroundColor(DesignSystem.Colors.warning)
-                                        Text("Preencha pelo menos o nome ou ID do paciente")
-                                            .font(DesignSystem.Typography.caption)
-                                            .foregroundColor(DesignSystem.Colors.warning)
-                                    }
-                                    .padding(.top, DesignSystem.Spacing.xs)
-                                }
-                            }
-                        }
-                        .padding(DesignSystem.Spacing.lg)
-                        .cardStyle()
-                        
-                        // Body location picker
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Local do Corpo")
-                                .font(.headline)
-                            
-                            Button {
-                                showingBodyLocationPicker = true
-                            } label: {
-                                HStack {
-                                    Text(selectedBodyLocation.isEmpty ? "Selecionar local..." : selectedBodyLocation)
-                                        .foregroundColor(selectedBodyLocation.isEmpty ? .secondary : .primary)
-                                    Spacer()
-                                    Image(systemName: "chevron.down")
-                                        .foregroundColor(.secondary)
-                                }
-                                .padding()
-                                .background(Color(.systemGray6))
-                                .cornerRadius(8)
-                            }
-                        }
-                        
-                        // Notes section
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Observações")
-                                .font(.headline)
-                            
-                            TextField("Adicione observações sobre a lesão (opcional)", text: $userNotes, axis: .vertical)
-                                .textFieldStyle(.roundedBorder)
-                                .lineLimit(3...6)
-                        }
-                        
-                        // Metadata info
-                        if let metadata = metadata {
-                            metadataSection(metadata)
-                        }
-                        
-                        // Add some bottom padding for safe scrolling
-                        Spacer(minLength: 100)
+                            .frame(maxHeight: 300)
+                        Spacer()
                     }
-                    .padding(.horizontal)
+                    .listRowInsets(EdgeInsets(top: 10, leading: 0, bottom: 10, trailing: 0))
+                    .listRowBackground(Color.clear)
                 }
                 
-                // Action buttons
-                VStack(spacing: 12) {
-                    Button {
-                        onSave(selectedBodyLocation, userNotes, patientName, patientID)
-                    } label: {
-                        HStack {
-                            Image(systemName: "checkmark")
-                            Text("Salvar Foto")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(isPatientInfoValid && !selectedBodyLocation.isEmpty ? Color.blue : Color(.systemGray4))
-                        .foregroundColor(.white)
-                        .cornerRadius(12)
+                Section(header: Text("Informações do Paciente")) {
+                    VStack(alignment: .leading) {
+                        Text("Nome do Paciente")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        TextField("Digite o nome completo", text: $patientName)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.words)
+                            .submitLabel(.next)
+                            .onSubmit {
+                                // Move focus to next field - will be handled by iOS
+                            }
                     }
-                    .disabled(!isPatientInfoValid || selectedBodyLocation.isEmpty)
                     
-                    Button {
-                        onRetake()
-                    } label: {
+                    VStack(alignment: .leading) {
+                        Text("ID/Registro do Paciente")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        TextField("Ex: 12345 ou RG123456", text: $patientID)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .submitLabel(.done)
+                            .onSubmit {
+                                // Dismiss keyboard
+                                UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                            }
+                    }
+                    
+                    if patientName.isEmpty && patientID.isEmpty {
                         HStack {
-                            Image(systemName: "camera.rotate")
-                            Text("Tirar Nova Foto")
+                            Image(systemName: "info.circle")
+                                .foregroundColor(.orange)
+                            Text("Preencha pelo menos um campo")
+                                .font(.caption)
+                                .foregroundColor(.orange)
                         }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(.systemGray5))
-                        .foregroundColor(.primary)
-                        .cornerRadius(12)
                     }
                 }
-                .padding()
+                
+                Section(header: Text("Local do Corpo")) {
+                    Button {
+                        print("📍 Body location button tapped")
+                        showingBodyLocationPicker = true
+                    } label: {
+                        HStack {
+                            Text(selectedBodyLocation.isEmpty ? "Selecionar local..." : selectedBodyLocation)
+                                .foregroundColor(selectedBodyLocation.isEmpty ? .secondary : .primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+                
+                Section(header: Text("Observações")) {
+                    TextField("Adicione observações sobre a lesão (opcional)", text: $userNotes, axis: .vertical)
+                        .lineLimit(3...6)
+                        .autocorrectionDisabled()
+                }
             }
-            .navigationTitle("Nova Foto")
-            .navigationBarTitleDisplayMode(.inline)
-            .sheet(isPresented: $showingBodyLocationPicker) {
-                bodyLocationPicker
+            .listStyle(InsetGroupedListStyle())
+            .scrollDismissesKeyboard(.interactively)
+            
+            // Action buttons
+            VStack(spacing: 12) {
+                Button {
+                    onSave(selectedBodyLocation, userNotes, patientName, patientID)
+                } label: {
+                    Text("Salvar Foto")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(isPatientInfoValid && !selectedBodyLocation.isEmpty ? Color.blue : Color.gray)
+                        .foregroundColor(.white)
+                        .cornerRadius(10)
+                }
+                .disabled(!isPatientInfoValid || selectedBodyLocation.isEmpty)
+                
+                Button {
+                    onRetake()
+                } label: {
+                    Text("Tirar Nova Foto")
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .foregroundColor(.blue)
+                }
+            }
+            .padding()
+        }
+        .sheet(isPresented: $showingBodyLocationPicker) {
+            bodyLocationPicker
+        }
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Pronto") {
+                    UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                }
             }
         }
     }
@@ -200,44 +195,6 @@ struct PhotoPreviewView: View {
             }
         }
         .presentationDetents([.medium])
-    }
-    
-    private func metadataSection(_ metadata: [String: Any]) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Informações da Captura")
-                .font(.headline)
-            
-            VStack(spacing: 6) {
-                if let dimensions = extractImageDimensions(metadata) {
-                    metadataRow(label: "Dimensões", value: dimensions)
-                }
-                
-                if let orientation = extractOrientation(metadata) {
-                    metadataRow(label: "Orientação", value: orientation)
-                }
-                
-                if let hasFlash = extractFlashInfo(metadata) {
-                    metadataRow(label: "Flash", value: hasFlash ? "Usado" : "Não usado")
-                }
-                
-                metadataRow(label: "Data/Hora", value: Date().formatted(date: .abbreviated, time: .shortened))
-            }
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(12)
-    }
-    
-    private func metadataRow(label: String, value: String) -> some View {
-        HStack {
-            Text(label)
-                .font(.caption)
-                .foregroundColor(.secondary)
-            Spacer()
-            Text(value)
-                .font(.caption)
-                .fontWeight(.medium)
-        }
     }
     
     // MARK: - Metadata Extraction Helpers

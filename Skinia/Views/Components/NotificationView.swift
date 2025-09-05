@@ -84,7 +84,7 @@ final class NotificationManager {
 
 // MARK: - Environment Key
 
-private struct NotificationManagerKey: EnvironmentKey {
+private struct NotificationManagerKey: @preconcurrency EnvironmentKey {
     @MainActor static let defaultValue = NotificationManager()
 }
 

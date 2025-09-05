@@ -38,7 +38,7 @@ struct NotificationSettingsView: View {
                     }
                     .toggleStyle(SwitchToggleStyle(tint: DesignSystem.Colors.primary))
                     .disabled(notificationAuthorizationStatus == .denied)
-                    .onChange(of: notificationsEnabled) { newValue in
+                    .onChange(of: notificationsEnabled) { _, newValue in
                         if newValue && notificationAuthorizationStatus == .notDetermined {
                             requestNotificationPermission()
                         }

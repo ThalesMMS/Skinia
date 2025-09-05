@@ -54,6 +54,7 @@ struct AnalysisDetailView: View {
                                 .foregroundColor(DesignSystem.Colors.textSecondary)
                                 .multilineTextAlignment(.center)
                         }
+                        .frame(maxWidth: .infinity)
                         .padding(DesignSystem.Spacing.lg)
                         .cardStyle()
                         .id("progress-section")
@@ -552,6 +553,7 @@ struct AnalysisDetailView: View {
                 Text(notes)
                     .font(.subheadline)
                     .padding()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(.systemBackground))
                     .cornerRadius(8)
             } else {
@@ -559,8 +561,10 @@ struct AnalysisDetailView: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .italic()
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .padding(.vertical, 16)
         .padding(.horizontal, 16)
         .background(DesignSystem.Colors.backgroundSecondary)
@@ -648,7 +652,7 @@ struct AnalysisDetailView: View {
     }
     
     private func saveToPhotos() {
-        guard let image = photo.fullImage else { return }
+        guard photo.fullImage != nil else { return }
         
         // Save to photo library (implementation needed)
         notificationManager.show(

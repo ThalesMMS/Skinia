@@ -98,7 +98,11 @@ class CameraViewController: UIViewController {
     private func setupLivePreview() {
         videoPreviewLayer = AVCaptureVideoPreviewLayer(session: captureSession)
         videoPreviewLayer.videoGravity = .resizeAspectFill
-        videoPreviewLayer.connection?.videoOrientation = .portrait
+        if #available(iOS 17.0, *) {
+            videoPreviewLayer.connection?.videoRotationAngle = 0
+        } else {
+            videoPreviewLayer.connection?.videoOrientation = .portrait
+        }
         view.layer.addSublayer(videoPreviewLayer)
     }
     

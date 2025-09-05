@@ -314,7 +314,7 @@ struct CircularProgressView: View {
         .onAppear {
             animatedProgress = progress
         }
-        .onChange(of: progress) { newProgress in
+        .onChange(of: progress) { _, newProgress in
             withAnimation(DesignSystem.Animations.progressUpdate) {
                 animatedProgress = newProgress
             }
@@ -359,7 +359,7 @@ struct LinearProgressView: View {
         .onAppear {
             animatedProgress = progress
         }
-        .onChange(of: progress) { newProgress in
+        .onChange(of: progress) { _, newProgress in
             withAnimation(DesignSystem.Animations.progressUpdate) {
                 animatedProgress = newProgress
             }

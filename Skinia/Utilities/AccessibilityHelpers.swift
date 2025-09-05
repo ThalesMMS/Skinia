@@ -13,8 +13,8 @@ extension View {
     func smartAccessibilityTraits(isButton: Bool = false, isSelected: Bool = false, isDisabled: Bool = false) -> some View {
         var traits: AccessibilityTraits = []
         
-        if isButton { traits.insert(.isButton) }
-        if isSelected { traits.insert(.isSelected) }
+        if isButton { _ = traits.insert(.isButton) }
+        if isSelected { _ = traits.insert(.isSelected) }
         // Note: .notEnabled doesn't exist in SwiftUI, disabled state is handled differently
         
         return self.accessibilityAddTraits(traits)
