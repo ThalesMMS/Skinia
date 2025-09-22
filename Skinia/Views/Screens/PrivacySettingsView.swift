@@ -1,10 +1,33 @@
 import SwiftUI
+import SwiftData
 
 struct PrivacySettingsView: View {
+    private let analysisExportService: any AnalysisExportServiceProtocol
+    private let photoRepository: any PhotoRepositoryProtocol
+    private let shareSheetPresenter: ShareSheetPresenter
+    private let modelContainer: ModelContainer
+
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.notificationManager) private var notificationManager
     @State private var showingDataDeletionAlert = false
     @State private var showingPermissionsInfo = false
-    
+    @State private var isShareSheetPresented = false
+    @State private var exportedFileURL: URL?
+    @State private var pendingSuccessMessage: String?
+    @State private var pendingErrorMessage: String?
+
+    init(
+        analysisExportService: any AnalysisExportServiceProtocol = DependencyContainer.shared.analysisExportService,
+        photoRepository: any PhotoRepositoryProtocol = DependencyContainer.shared.photoRepository,
+        shareSheetPresenter: ShareSheetPresenter = DependencyContainer.shared.shareSheetPresenter,
+        modelContainer: ModelContainer = DependencyContainer.shared.modelContainer
+    ) {
+        self.analysisExportService = analysisExportService
+        self.photoRepository = photoRepository
+        self.shareSheetPresenter = shareSheetPresenter
+        self.modelContainer = modelContainer
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
@@ -131,7 +154,7 @@ struct PrivacySettingsView: View {
                                     status: .available,
                                     icon: "square.and.arrow.up",
                                     action: {
-                                        // TODO: Implementar exportação
+                                        exportAllData()
                                     }
                                 ),
                                 PrivacyItem(
@@ -171,22 +194,95 @@ struct PrivacySettingsView: View {
         } message: {
             Text("Esta ação não pode ser desfeita. Todas as suas fotos, análises e dados serão permanentemente removidos do dispositivo.")
         }
+        .onChange(of: exportedFileURL) { _, url in
+            guard isShareSheetPresented, let url else { return }
+            shareSheetPresenter.present(items: [url])
+            exportedFileURL = nil
+            isShareSheetPresented = false
+        }
+        .onChange(of: pendingSuccessMessage) { _, message in
+            guard let message else { return }
+            notificationManager.show(
+                title: "Tudo pronto",
+                message: message,
+                type: .success
+            )
+            pendingSuccessMessage = nil
+        }
+        .onChange(of: pendingErrorMessage) { _, message in
+            guard let message else { return }
+            notificationManager.show(
+                title: "Algo deu errado",
+                message: message,
+                type: .error
+            )
+            pendingErrorMessage = nil
+        }
     }
-    
+
     private func openAppSettings() {
         guard let settingsUrl = URL(string: UIApplication.openSettingsURLString) else {
             return
         }
-        
+
         if UIApplication.shared.canOpenURL(settingsUrl) {
             UIApplication.shared.open(settingsUrl)
         }
     }
-    
+
+    private func exportAllData() {
+        do {
+            let photos = try photoRepository.fetchAll()
+
+            guard !photos.isEmpty else {
+                HapticManager.shared.notification(.warning)
+                pendingErrorMessage = "Não há dados disponíveis para exportação."
+                return
+            }
+
+            let fileURL = try analysisExportService.exportPhotos(photos, format: .pdf)
+            exportedFileURL = fileURL
+            isShareSheetPresented = true
+
+            HapticManager.shared.notification(.success)
+            pendingSuccessMessage = "Arquivo gerado com sucesso. Escolha onde deseja salvar ou compartilhar."
+        } catch {
+            exportedFileURL = nil
+            isShareSheetPresented = false
+
+            HapticManager.shared.notification(.error)
+            pendingErrorMessage = error.localizedDescription
+        }
+    }
+
     private func deleteAllData() {
-        // TODO: Implementar exclusão real dos dados
-        HapticManager.shared.notification(.success)
-        dismiss()
+        Task { @MainActor in
+            do {
+                try photoRepository.deleteAll()
+                try deleteAllExams()
+
+                HapticManager.shared.notification(.success)
+                pendingSuccessMessage = "Todos os dados foram removidos do dispositivo."
+                dismiss()
+            } catch {
+                HapticManager.shared.notification(.error)
+                pendingErrorMessage = "Não foi possível remover todos os dados: \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func deleteAllExams() throws {
+        let context = modelContainer.mainContext
+        let descriptor = FetchDescriptor<Exam>()
+        let exams = try context.fetch(descriptor)
+
+        guard !exams.isEmpty else { return }
+
+        for exam in exams {
+            context.delete(exam)
+        }
+
+        try context.save()
     }
 }
 
