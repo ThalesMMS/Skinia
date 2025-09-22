@@ -36,8 +36,7 @@ final class AnalysisListCoordinator: NavigationCoordinator, ObservableObject {
     
     // MARK: - Navigation Methods
     func showAnalysisDetail(for photo: SkinLesionPhoto) {
-        // This method is now handled directly in AnalysisListView
-        print("🔍 Navigation handled by AnalysisListView for photo: \(photo.id)")
+        // Navigation handled directly in AnalysisListView
     }
 }
 
