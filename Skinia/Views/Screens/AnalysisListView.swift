@@ -1,22 +1,5 @@
 import SwiftUI
 
-class SheetState: ObservableObject {
-    @Published var selectedPhoto: SkinLesionPhoto?
-    @Published var isShowing: Bool = false
-    
-    func showSheet(with photo: SkinLesionPhoto) {
-        print("🔍 SheetState: Setting photo \(photo.id) and showing sheet")
-        selectedPhoto = photo
-        isShowing = true
-    }
-    
-    func hideSheet() {
-        print("🔍 SheetState: Hiding sheet and clearing photo")
-        isShowing = false
-        selectedPhoto = nil
-    }
-}
-
 struct AnalysisListView: View {
     private let exportService: any AnalysisExportServiceProtocol
     private let shareSheetPresenter: ShareSheetPresenter
@@ -27,11 +10,9 @@ struct AnalysisListView: View {
     @State private var showingFilterSheet = false
     @State private var showingSearchField = false
     @State private var showingHistoryOptions = false
-    @State private var showingBatchActions = false
-    @State private var selectedPhotos = Set<UUID>()
-    @State private var isSelectionMode = false
-    @StateObject private var sheetState = SheetState()
-    @State private var activeAlert: AlertContext?
+    @StateObject private var sheetState = AnalysisDetailSheetState()
+    @StateObject private var selectionHelper = AnalysisListSelectionHelper()
+    @State private var activeAlert: AnalysisListAlertContext?
     @State private var showingDeleteConfirmation = false
 
     init(
@@ -46,14 +27,14 @@ struct AnalysisListView: View {
             photoRepository: coordinator.dependencyContainer.photoRepository
         ))
     }
-    
+
     var body: some View {
         NavigationView {
             Group {
                 if viewModel.isLoading {
-                    LoadingView()
+                    AnalysisListLoadingView()
                 } else if !viewModel.hasPhotos {
-                    EmptyStateView {
+                    AnalysisListEmptyStateView {
                         do {
                             try PreviewPhotoFactory.seed(repository: coordinator.dependencyContainer.photoRepository)
                             viewModel.loadPhotos()
@@ -68,15 +49,15 @@ struct AnalysisListView: View {
             .navigationTitle("Análises")
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarLeading) {
-                    if isSelectionMode {
+                    if selectionHelper.isSelectionMode {
                         Button("Cancelar") {
-                            clearSelection()
+                            selectionHelper.clearSelection()
                         }
                     }
                 }
 
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    if isSelectionMode {
+                    if selectionHelper.isSelectionMode {
                         Menu {
                             Button("Exportar Selecionadas") {
                                 exportSelectedPhotos()
@@ -95,28 +76,27 @@ struct AnalysisListView: View {
                         } label: {
                             Image(systemName: "magnifyingglass")
                         }
-                        
+
                         Button {
                             showingFilterSheet = true
                         } label: {
                             Image(systemName: viewModel.selectedStatusFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                         }
-                        
+
                         Menu {
                             Button("Estatísticas") {
                                 showingHistoryOptions = true
                             }
-                            
+
                             Button("Exportar Todas") {
-                                exportAllPhotos()
+                                activeAlert = exportAllPhotos()
                             }
 
                             Button("Selecionar") {
-                                if isSelectionMode {
-                                    clearSelection()
+                                if selectionHelper.isSelectionMode {
+                                    selectionHelper.clearSelection()
                                 } else {
-                                    isSelectionMode = true
-                                    selectedPhotos.removeAll()
+                                    selectionHelper.enableSelectionMode()
                                 }
                             }
                         } label: {
@@ -135,10 +115,19 @@ struct AnalysisListView: View {
                 prompt: "Buscar por localização, tipo..."
             )
             .sheet(isPresented: $showingFilterSheet) {
-                FilterSheet(viewModel: viewModel)
+                AnalysisListFilterSheet(viewModel: viewModel)
             }
             .sheet(isPresented: $showingHistoryOptions) {
-                HistoryOptionsSheet(viewModel: viewModel)
+                AnalysisListHistoryOptionsSheet(
+                    viewModel: viewModel,
+                    activeAlert: $activeAlert,
+                    onExport: { format in
+                        exportAllPhotos(format: format)
+                    },
+                    onShareStatistics: {
+                        shareStatisticsSummary()
+                    }
+                )
             }
             .alert(item: $activeAlert) { alert in
                 Alert(
@@ -168,11 +157,9 @@ struct AnalysisListView: View {
             }
         }
         .onAppear {
-            // Load real data from repository
             viewModel.loadPhotos()
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
-            // Refresh data when app comes back to foreground
             Task {
                 await viewModel.refreshPhotos()
             }
@@ -189,7 +176,7 @@ struct AnalysisListView: View {
         }
         .onChange(of: viewModel.errorMessage) { _, message in
             if let message {
-                activeAlert = AlertContext(title: "Erro", message: message)
+                activeAlert = AnalysisListAlertContext(title: "Erro", message: message)
             }
         }
         .sheet(isPresented: $sheetState.isShowing) {
@@ -232,80 +219,40 @@ struct AnalysisListView: View {
             }
         }
     }
-    
+
     private var photosList: some View {
         List {
-            // Attention section
             if !viewModel.photosNeedingAttention.isEmpty {
                 Section {
                     ForEach(viewModel.photosNeedingAttention, id: \.id) { photo in
-                        HStack {
-                            if isSelectionMode {
-                                Button(action: {
-                                    toggleSelection(for: photo.id)
-                                }) {
-                                    Image(systemName: selectedPhotos.contains(photo.id) ? "checkmark.circle.fill" : "circle")
-                                        .foregroundColor(selectedPhotos.contains(photo.id) ? .blue : .gray)
-                                }
-                                .buttonStyle(PlainButtonStyle())
-                            }
-                            
-                            AnalysisListCell(photo: photo) {
-                                if !isSelectionMode {
-                                    print("🔍 Card tapped - showing detail for photo: \(photo.id)")
-                                    sheetState.showSheet(with: photo)
-                                } else {
-                                    toggleSelection(for: photo.id)
+                        photoRow(for: photo)
+                            .swipeActions(edge: .trailing) {
+                                Button("Excluir", role: .destructive) {
+                                    viewModel.deletePhoto(photo)
                                 }
                             }
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button("Excluir", role: .destructive) {
-                                viewModel.deletePhoto(photo)
-                            }
-                        }
                     }
                 } header: {
                     Label("Requerem Atenção", systemImage: "exclamationmark.triangle.fill")
                         .foregroundColor(.red)
                 }
             }
-            
-            // All photos section
+
             Section {
                 ForEach(viewModel.photos, id: \.id) { photo in
-                    HStack {
-                        if isSelectionMode {
-                            Button(action: {
-                                toggleSelection(for: photo.id)
-                            }) {
-                                Image(systemName: selectedPhotos.contains(photo.id) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(selectedPhotos.contains(photo.id) ? .blue : .gray)
-                            }
-                            .buttonStyle(PlainButtonStyle())
-                        }
-                        
-                        AnalysisListCell(photo: photo) {
-                            if !isSelectionMode {
-                                print("🔍 Card tapped - showing detail for photo: \(photo.id)")
-                                sheetState.showSheet(with: photo)
-                            } else {
-                                toggleSelection(for: photo.id)
+                    photoRow(for: photo)
+                        .swipeActions(edge: .trailing) {
+                            Button("Excluir", role: .destructive) {
+                                viewModel.deletePhoto(photo)
                             }
                         }
-                    }
-                    .swipeActions(edge: .trailing) {
-                        Button("Excluir", role: .destructive) {
-                            viewModel.deletePhoto(photo)
-                        }
-                    }
                 }
             } header: {
                 HStack {
                     Text("Todas as Análises")
-                    
+
                     Spacer()
-                    
+
                     if viewModel.selectedStatusFilter != nil || !viewModel.searchText.isEmpty {
                         Button("Limpar Filtros") {
                             viewModel.clearFilters()
@@ -320,80 +267,64 @@ struct AnalysisListView: View {
         .animation(DesignSystem.Animations.gentle, value: viewModel.photos)
         .animation(DesignSystem.Animations.gentle, value: viewModel.photosNeedingAttention)
     }
-    
-    // MARK: - Helper Functions
-    
-    private func toggleSelection(for photoId: UUID) {
-        if selectedPhotos.contains(photoId) {
-            selectedPhotos.remove(photoId)
-        } else {
-            selectedPhotos.insert(photoId)
+
+    @ViewBuilder
+    private func photoRow(for photo: SkinLesionPhoto) -> some View {
+        HStack {
+            if selectionHelper.isSelectionMode {
+                Button(action: {
+                    selectionHelper.toggleSelection(for: photo.id)
+                }) {
+                    Image(systemName: selectionHelper.isSelected(photo.id) ? "checkmark.circle.fill" : "circle")
+                        .foregroundColor(selectionHelper.isSelected(photo.id) ? .blue : .gray)
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+
+            AnalysisListCell(photo: photo) {
+                if selectionHelper.isSelectionMode {
+                    selectionHelper.toggleSelection(for: photo.id)
+                } else {
+                    print("🔍 Card tapped - showing detail for photo: \(photo.id)")
+                    sheetState.showSheet(with: photo)
+                }
+            }
         }
     }
 
     private func exportSelectedPhotos() {
-        let photosToExport = viewModel.getAllPhotos.filter { selectedPhotos.contains($0.id) }
-        _ = performExport(
-            photos: photosToExport,
-            format: .pdf,
-            emptyMessage: "Selecione ao menos uma foto para exportar."
+        activeAlert = selectionHelper.exportSelectedPhotos(
+            using: viewModel,
+            exportService: exportService,
+            shareSheetPresenter: shareSheetPresenter
         )
-        clearSelection()
     }
 
-    private func exportAllPhotos() {
-        _ = performExport(photos: viewModel.getAllPhotos, format: .pdf, emptyMessage: "Nenhuma foto disponível para exportação.")
+    private func exportAllPhotos(
+        format: AnalysisExportFormat = .pdf,
+        emptyMessage: String = "Nenhuma foto disponível para exportação."
+    ) -> AnalysisListAlertContext? {
+        selectionHelper.exportAllPhotos(
+            using: viewModel,
+            format: format,
+            exportService: exportService,
+            shareSheetPresenter: shareSheetPresenter,
+            emptyMessage: emptyMessage
+        )
     }
 
     private func deleteSelectedPhotos() {
-        let photosToDelete = viewModel.getAllPhotos.filter { selectedPhotos.contains($0.id) }
-        for photo in photosToDelete {
-            viewModel.deletePhoto(photo)
-        }
-        clearSelection()
+        selectionHelper.deleteSelectedPhotos(using: viewModel)
     }
 
-    private func clearSelection() {
-        selectedPhotos.removeAll()
-        isSelectionMode = false
-    }
-
-    @discardableResult
-    private func performExport(
-        photos: [SkinLesionPhoto],
-        format: AnalysisExportFormat,
-        emptyMessage: String
-    ) -> Bool {
-        guard !photos.isEmpty else {
-            activeAlert = AlertContext(
-                title: "Nenhuma foto disponível",
-                message: emptyMessage
-            )
-            return false
-        }
-
-        do {
-            let fileURL = try exportService.exportPhotos(photos, format: format)
-            shareSheetPresenter.present(items: [fileURL])
-            return true
-        } catch {
-            activeAlert = AlertContext(
-                title: "Erro ao exportar",
-                message: error.localizedDescription
-            )
-            return false
-        }
-    }
-
-    private func shareStatisticsSummary() {
+    private func shareStatisticsSummary() -> AnalysisListAlertContext? {
         let photos = viewModel.getAllPhotos
 
         guard !photos.isEmpty else {
-            activeAlert = AlertContext(
+            return AnalysisListAlertContext(
                 title: "Sem dados",
                 message: "Cadastre análises para compartilhar estatísticas."
             )
-            return
         }
 
         let total = photos.count
@@ -412,360 +343,9 @@ struct AnalysisListView: View {
         """
 
         shareSheetPresenter.present(items: [summary])
+        return nil
     }
 }
-
-// MARK: - Supporting Views
-
-private struct AlertContext: Identifiable {
-    let id = UUID()
-    let title: String
-    let message: String
-}
-
-private struct LoadingView: View {
-    var body: some View {
-        VStack(spacing: DesignSystem.Spacing.lg) {
-            PulsatingCircle(
-                color: DesignSystem.Colors.primary,
-                size: 60
-            )
-            
-            VStack(spacing: DesignSystem.Spacing.sm) {
-                Text("Carregando análises...")
-                    .font(DesignSystem.Typography.headline)
-                    .foregroundColor(DesignSystem.Colors.text)
-                
-                LoadingDots()
-            }
-            
-            // Skeleton loaders
-            VStack(spacing: DesignSystem.Spacing.md) {
-                ForEach(0..<3) { _ in
-                    VStack(spacing: DesignSystem.Spacing.sm) {
-                        HStack {
-                            SkeletonLoader(height: 60, cornerRadius: DesignSystem.CornerRadius.sm)
-                                .frame(width: 60)
-                            
-                            VStack(spacing: DesignSystem.Spacing.xs) {
-                                SkeletonLoader(height: 16)
-                                SkeletonLoader(height: 12)
-                                SkeletonLoader(height: 10)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                            }
-                        }
-                    }
-                    .cardStyle()
-                }
-            }
-            .padding(.top, DesignSystem.Spacing.lg)
-        }
-        .padding(DesignSystem.Spacing.lg)
-    }
-}
-
-private struct EmptyStateView: View {
-    let onLoadSampleData: () -> Void
-
-    private let instructionsText = "Capture uma foto da lesão ou importe uma imagem da galeria para iniciar uma nova análise e acompanhar os resultados aqui."
-
-    var body: some View {
-#if DEBUG
-        EnhancedEmptyStateView(
-            icon: "photo.stack",
-            title: "Nenhuma Análise Encontrada",
-            subtitle: instructionsText,
-            actionTitle: "Carregar Dados de Exemplo",
-            action: onLoadSampleData
-        )
-#else
-        EnhancedEmptyStateView(
-            icon: "photo.stack",
-            title: "Nenhuma Análise Encontrada",
-            subtitle: instructionsText
-        )
-#endif
-    }
-}
-
-private struct FilterSheet: View {
-    let viewModel: AnalysisListViewModel
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            List {
-                Section("Filtrar por Status") {
-                    ForEach([AnalysisStatus?.none] + viewModel.statusFilterOptions.map { Optional($0) }, id: \.self) { status in
-                        HStack {
-                            if let status = status {
-                                StatusBadge(status: status)
-                            } else {
-                                Text("Todos")
-                                    .fontWeight(.medium)
-                            }
-                            
-                            Spacer()
-                            
-                            if viewModel.selectedStatusFilter == status {
-                                Image(systemName: "checkmark")
-                                    .foregroundColor(.blue)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            viewModel.setStatusFilter(status)
-                            dismiss()
-                        }
-                    }
-                }
-            }
-            .navigationTitle("Filtros")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Concluído") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .presentationDetents([.medium])
-    }
-}
-
-private struct HistoryOptionsSheet: View {
-    let viewModel: AnalysisListViewModel
-    @Environment(\.dismiss) private var dismiss
-    
-    var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(spacing: 24) {
-                    // Statistics Overview
-                    statisticsSection
-                    
-                    // Date Range Analysis
-                    dateRangeSection
-                    
-                    // Risk Distribution
-                    riskDistributionSection
-                    
-                    // Export Options
-                    exportOptionsSection
-                }
-                .padding()
-            }
-            .navigationTitle("Estatísticas do Histórico")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Concluído") {
-                        dismiss()
-                    }
-                }
-            }
-        }
-        .presentationDetents([.large])
-    }
-    
-    private var statisticsSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Resumo Geral")
-                .font(.title2)
-                .fontWeight(.bold)
-            
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 16) {
-                StatCard(
-                    title: "Total de Análises",
-                    value: "\(viewModel.getAllPhotos.count)",
-                    icon: "photo.stack",
-                    color: .blue
-                )
-                
-                StatCard(
-                    title: "Concluídas",
-                    value: "\(viewModel.getAllPhotos.filter { $0.analysisStatus == .completed }.count)",
-                    icon: "checkmark.circle.fill",
-                    color: .green
-                )
-                
-                StatCard(
-                    title: "Em Análise",
-                    value: "\(viewModel.getAllPhotos.filter { $0.analysisStatus == .analyzing }.count)",
-                    icon: "brain.head.profile",
-                    color: .orange
-                )
-                
-                StatCard(
-                    title: "Falharam",
-                    value: "\(viewModel.getAllPhotos.filter { $0.analysisStatus == .failed }.count)",
-                    icon: "exclamationmark.triangle.fill",
-                    color: .red
-                )
-            }
-        }
-    }
-    
-    private var dateRangeSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Análise por Período")
-                .font(.headline)
-            
-            if let oldestPhoto = viewModel.getAllPhotos.min(by: { $0.captureDate < $1.captureDate }),
-               let newestPhoto = viewModel.getAllPhotos.max(by: { $0.captureDate < $1.captureDate }) {
-                
-                HStack {
-                    VStack(alignment: .leading) {
-                        Text("Primeira Análise")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(oldestPhoto.formattedCaptureDate)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                    
-                    Spacer()
-                    
-                    VStack(alignment: .trailing) {
-                        Text("Última Análise")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                        Text(newestPhoto.formattedCaptureDate)
-                            .font(.subheadline)
-                            .fontWeight(.medium)
-                    }
-                }
-                .padding()
-                .background(DesignSystem.Colors.backgroundSecondary)
-                .cornerRadius(12)
-            }
-        }
-    }
-    
-    private var riskDistributionSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Distribuição de Risco")
-                .font(.headline)
-            
-            let completedPhotos = viewModel.getAllPhotos.filter { $0.analysisResult != nil }
-            
-            if !completedPhotos.isEmpty {
-                VStack(spacing: 8) {
-                    ForEach([RiskLevel.low, .moderate, .high, .urgent], id: \.self) { riskLevel in
-                        let count = completedPhotos.filter { $0.analysisResult?.riskLevel == riskLevel }.count
-                        let percentage = count > 0 ? Double(count) / Double(completedPhotos.count) : 0.0
-                        
-                        HStack {
-                            RiskBadge(riskLevel: riskLevel)
-                            
-                            Spacer()
-                            
-                            Text("\(count)")
-                                .font(.subheadline)
-                                .fontWeight(.semibold)
-                            
-                            Text("(\(Int(percentage * 100))%)")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .padding(.vertical, 4)
-                    }
-                }
-                .padding()
-                .background(DesignSystem.Colors.backgroundSecondary)
-                .cornerRadius(12)
-            } else {
-                Text("Nenhuma análise concluída disponível")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .italic()
-            }
-        }
-    }
-    
-    private var exportOptionsSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Opções de Exportação")
-                .font(.headline)
-            
-            VStack(spacing: 8) {
-                Button("Exportar Relatório Completo (PDF)") {
-                    _ = performExport(
-                        photos: viewModel.getAllPhotos,
-                        format: .pdf,
-                        emptyMessage: "Nenhuma foto disponível para exportação."
-                    )
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(Color.blue)
-                .foregroundColor(.white)
-                .cornerRadius(12)
-
-                Button("Exportar Dados CSV") {
-                    _ = performExport(
-                        photos: viewModel.getAllPhotos,
-                        format: .csv,
-                        emptyMessage: "Nenhuma foto disponível para exportação."
-                    )
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(DesignSystem.Colors.backgroundSecondary)
-                .foregroundColor(.primary)
-                .cornerRadius(12)
-
-                Button("Compartilhar Estatísticas") {
-                    shareStatisticsSummary()
-                }
-                .frame(maxWidth: .infinity)
-                .padding()
-                .background(DesignSystem.Colors.backgroundSecondary)
-                .foregroundColor(.primary)
-                .cornerRadius(12)
-            }
-        }
-    }
-}
-
-private struct StatCard: View {
-    let title: String
-    let value: String
-    let icon: String
-    let color: Color
-    
-    var body: some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 24))
-                .foregroundColor(color)
-            
-            Text(value)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.primary)
-            
-            Text(title)
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-        .padding()
-        .background(DesignSystem.Colors.surface)
-        .cornerRadius(12)
-        .overlay(
-            RoundedRectangle(cornerRadius: 12)
-                .stroke(color.opacity(0.3), lineWidth: 1)
-        )
-    }
-}
-
-// MARK: - Preview
 
 #Preview {
     let container = DependencyContainer.shared
