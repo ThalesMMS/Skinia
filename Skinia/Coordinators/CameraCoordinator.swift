@@ -2,15 +2,29 @@ import Foundation
 import SwiftUI
 import Photos
 
+protocol CameraCoordinating: AnyObject {
+    func start()
+    func navigateToAnalysisList()
+    func savePhotoToAnalysisList(
+        _ imageData: Data,
+        bodyLocation: String?,
+        userNotes: String?,
+        patientName: String?,
+        patientID: String?,
+        metadata: PhotoMetadata
+    ) async throws -> SkinLesionPhoto
+}
+
 @MainActor
-final class CameraCoordinator: NavigationCoordinator, ObservableObject {
+final class CameraCoordinator: NavigationCoordinator, ObservableObject, CameraCoordinating {
     @Published var navigationPath = NavigationPath()
     @Published var photoLibraryStatus: PHAuthorizationStatus = .notDetermined
-    
+
     var parent: (any Coordinator)?
     var children: [any Coordinator] = []
-    
+
     let dependencyContainer: DependencyContainer
+    private lazy var cameraViewModel = CameraViewModel(coordinator: self)
     
     init(dependencyContainer: DependencyContainer) {
         self.dependencyContainer = dependencyContainer
@@ -56,7 +70,7 @@ final class CameraCoordinator: NavigationCoordinator, ObservableObject {
             get: { self.navigationPath },
             set: { self.navigationPath = $0 }
         )) {
-            CameraScreen(coordinator: self)
+            CameraScreen(viewModel: cameraViewModel)
         }
     }
 }
