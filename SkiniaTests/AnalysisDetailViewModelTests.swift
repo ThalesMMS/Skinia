@@ -84,6 +84,27 @@ struct AnalysisDetailViewModelTests {
         }
     }
 
+    @MainActor
+    private final class MockAnalysisExportService: AnalysisExportServiceProtocol {
+        enum MockError: Error {
+            case exportFailed
+        }
+
+        var exportedPhotos: [[SkinLesionPhoto]] = []
+        var shouldThrow = false
+        var urlToReturn = URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("mock.pdf")
+
+        func exportPhotos(_ photos: [SkinLesionPhoto], format: AnalysisExportFormat) throws -> URL {
+            exportedPhotos.append(photos)
+
+            if shouldThrow {
+                throw MockError.exportFailed
+            }
+
+            return urlToReturn
+        }
+    }
+
     private func makeViewModel(status: AnalysisStatus = .failed) -> (AnalysisDetailViewModel, MockPhotoRepository, MockAnalysisService, SkinLesionPhoto) {
         let repository = MockPhotoRepository()
         let photo = SkinLesionPhoto(
@@ -122,5 +143,28 @@ struct AnalysisDetailViewModelTests {
         #expect(service.retryCalled)
         #expect(viewModel.errorMessage != nil)
         #expect(!viewModel.isRetrying)
+    }
+
+    @Test
+    func exportReportSuccessReturnsURL() throws {
+        let (viewModel, _, _, photo) = makeViewModel(status: .completed)
+        let exportService = MockAnalysisExportService()
+
+        let url = try viewModel.exportReport(using: exportService)
+
+        #expect(url == exportService.urlToReturn)
+        #expect(exportService.exportedPhotos.count == 1)
+        #expect(exportService.exportedPhotos.first?.first === photo)
+    }
+
+    @Test
+    func exportReportFailurePropagatesError() {
+        let (viewModel, _, _, _) = makeViewModel(status: .completed)
+        let exportService = MockAnalysisExportService()
+        exportService.shouldThrow = true
+
+        #expect(throws: MockAnalysisExportService.MockError.exportFailed) {
+            _ = try viewModel.exportReport(using: exportService)
+        }
     }
 }

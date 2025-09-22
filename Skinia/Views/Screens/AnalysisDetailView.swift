@@ -1,18 +1,25 @@
+import Photos
 import SwiftUI
+import UIKit
 
 struct AnalysisDetailView: View {
     @State private var viewModel: AnalysisDetailViewModel
     @Environment(\.notificationManager) private var notificationManager
 
-    @State private var showingShareSheet = false
+    private let analysisExportService: any AnalysisExportServiceProtocol
+    private let shareSheetPresenter: ShareSheetPresenter
     @State private var showingFullScreenImage = false
     @State private var showingPatientInfo = false
 
     init(
         photo: SkinLesionPhoto,
         photoRepository: any PhotoRepositoryProtocol,
-        analysisService: any AnalysisServiceProtocol
+        analysisService: any AnalysisServiceProtocol,
+        analysisExportService: any AnalysisExportServiceProtocol,
+        shareSheetPresenter: ShareSheetPresenter
     ) {
+        self.analysisExportService = analysisExportService
+        self.shareSheetPresenter = shareSheetPresenter
         _viewModel = State(
             wrappedValue: AnalysisDetailViewModel(
                 photo: photo,
@@ -91,14 +98,9 @@ struct AnalysisDetailView: View {
                 }
 
                 Button("Compartilhar") {
-                    showingShareSheet = true
+                    exportReport()
                 }
                 .disabled(viewModel.photo.analysisResult == nil)
-            }
-        }
-        .sheet(isPresented: $showingShareSheet) {
-            if let result = viewModel.photo.analysisResult {
-                ShareSheet(photo: viewModel.photo, result: result)
             }
         }
         .sheet(isPresented: $showingPatientInfo) {
@@ -180,21 +182,137 @@ struct AnalysisDetailView: View {
     }
 
     private func exportReport() {
-        notificationManager.show(
-            title: "Exportando Relatório",
-            message: "Gerando relatório em PDF...",
-            type: .info
-        )
+        do {
+            let fileURL = try viewModel.exportReport(using: analysisExportService)
+            shareSheetPresenter.present(items: [fileURL])
+            showNotification(
+                title: "Relatório Gerado",
+                message: "Selecione onde compartilhar o PDF.",
+                type: .success
+            )
+        } catch {
+            let message: String
+            if let localizedError = error as? LocalizedError,
+               let description = localizedError.errorDescription {
+                message = description
+            } else {
+                message = error.localizedDescription
+            }
+
+            showNotification(
+                title: "Erro ao Exportar",
+                message: message,
+                type: .error
+            )
+        }
     }
 
     private func saveToPhotos() {
-        guard viewModel.photo.fullImage != nil else { return }
+        guard let image = viewModel.photo.fullImage else {
+            showNotification(
+                title: "Erro ao Salvar",
+                message: "Não foi possível acessar a imagem para salvar.",
+                type: .error
+            )
+            return
+        }
 
-        notificationManager.show(
-            title: "Imagem Salva",
-            message: "Imagem salva na galeria com sucesso",
-            type: .success
-        )
+        let status = currentAuthorizationStatus()
+
+        switch status {
+        case .authorized, .limited:
+            saveImageToPhotoLibrary(image)
+        case .notDetermined:
+            requestPhotoLibraryAccess { authorization in
+                switch authorization {
+                case .authorized, .limited:
+                    saveImageToPhotoLibrary(image)
+                case .denied, .restricted:
+                    showNotification(
+                        title: "Permissão Necessária",
+                        message: "Autorize o acesso às fotos nas configurações para salvar a imagem.",
+                        type: .error
+                    )
+                case .notDetermined:
+                    break
+                @unknown default:
+                    showNotification(
+                        title: "Erro ao Salvar",
+                        message: "Não foi possível acessar a biblioteca de fotos.",
+                        type: .error
+                    )
+                }
+            }
+        case .denied, .restricted:
+            showNotification(
+                title: "Permissão Necessária",
+                message: "Autorize o acesso às fotos nas configurações para salvar a imagem.",
+                type: .error
+            )
+        @unknown default:
+            showNotification(
+                title: "Erro ao Salvar",
+                message: "Não foi possível acessar a biblioteca de fotos.",
+                type: .error
+            )
+        }
+    }
+
+    private func currentAuthorizationStatus() -> PHAuthorizationStatus {
+        if #available(iOS 14, *) {
+            return PHPhotoLibrary.authorizationStatus(for: .addOnly)
+        } else {
+            return PHPhotoLibrary.authorizationStatus()
+        }
+    }
+
+    private func requestPhotoLibraryAccess(_ completion: @escaping (PHAuthorizationStatus) -> Void) {
+        if #available(iOS 14, *) {
+            PHPhotoLibrary.requestAuthorization(for: .addOnly) { status in
+                DispatchQueue.main.async {
+                    completion(status)
+                }
+            }
+        } else {
+            PHPhotoLibrary.requestAuthorization { status in
+                DispatchQueue.main.async {
+                    completion(status)
+                }
+            }
+        }
+    }
+
+    private func saveImageToPhotoLibrary(_ image: UIImage) {
+        PHPhotoLibrary.shared().performChanges({
+            PHAssetChangeRequest.creationRequestForAsset(from: image)
+        }) { success, error in
+            DispatchQueue.main.async {
+                if success {
+                    showNotification(
+                        title: "Imagem Salva",
+                        message: "Imagem salva na galeria com sucesso.",
+                        type: .success
+                    )
+                } else {
+                    let message = error?.localizedDescription ?? "Não foi possível salvar a imagem."
+                    showNotification(
+                        title: "Erro ao Salvar",
+                        message: message,
+                        type: .error
+                    )
+                }
+            }
+        }
+    }
+
+    private func showNotification(
+        title: String,
+        message: String?,
+        type: StatusNotification.NotificationType
+    ) {
+        Task { @MainActor in
+            notificationManager.show(title: title, message: message, type: type)
+        }
     }
 }
 
@@ -294,7 +412,9 @@ private struct AnalysisErrorView: View {
         AnalysisDetailView(
             photo: mockPhoto,
             photoRepository: container.photoRepository,
-            analysisService: container.analysisService
+            analysisService: container.analysisService,
+            analysisExportService: container.analysisExportService,
+            shareSheetPresenter: container.shareSheetPresenter
         )
     }
 }

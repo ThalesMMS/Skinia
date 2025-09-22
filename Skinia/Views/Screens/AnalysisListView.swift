@@ -188,7 +188,9 @@ struct AnalysisListView: View {
                     AnalysisDetailView(
                         photo: photoToShow,
                         photoRepository: coordinator.dependencyContainer.photoRepository,
-                        analysisService: coordinator.dependencyContainer.analysisService
+                        analysisService: coordinator.dependencyContainer.analysisService,
+                        analysisExportService: exportService,
+                        shareSheetPresenter: shareSheetPresenter
                     )
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {

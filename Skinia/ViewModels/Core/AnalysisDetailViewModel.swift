@@ -74,5 +74,9 @@ final class AnalysisDetailViewModel {
     func deletePhoto() async throws {
         try photoRepository.delete(photo)
     }
-    
+
+    func exportReport(using service: any AnalysisExportServiceProtocol) throws -> URL {
+        try service.exportPhotos([photo], format: .pdf)
+    }
+
 }
