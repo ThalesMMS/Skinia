@@ -130,10 +130,6 @@ struct AnalysisListView: View {
         .onAppear {
             // Load real data from repository
             viewModel.loadPhotos()
-            // Also load some mock data for development if no real data exists
-            if !viewModel.hasPhotos {
-                viewModel.loadMockData()
-            }
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.willEnterForegroundNotification)) { _ in
             // Refresh data when app comes back to foreground
@@ -352,15 +348,25 @@ private struct LoadingView: View {
 
 private struct EmptyStateView: View {
     let onLoadMockData: () -> Void
-    
+
+    private let instructionsText = "Capture uma foto da lesão ou importe uma imagem da galeria para iniciar uma nova análise e acompanhar os resultados aqui."
+
     var body: some View {
+#if DEBUG
         EnhancedEmptyStateView(
             icon: "photo.stack",
             title: "Nenhuma Análise Encontrada",
-            subtitle: "Capture sua primeira foto para começar a análise de lesões de pele com inteligência artificial.",
+            subtitle: instructionsText,
             actionTitle: "Carregar Dados de Exemplo",
             action: onLoadMockData
         )
+#else
+        EnhancedEmptyStateView(
+            icon: "photo.stack",
+            title: "Nenhuma Análise Encontrada",
+            subtitle: instructionsText
+        )
+#endif
     }
 }
 
