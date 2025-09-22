@@ -2,12 +2,18 @@ import SwiftUI
 import MessageUI
 
 struct SettingsView: View {
+    private let legalDocumentOpener: LegalDocumentOpening
+
     @State private var showingFeedbackSheet = false
     @State private var showingHelpSheet = false
     @State private var showingPrivacySheet = false
     @State private var showingAboutSheet = false
     @State private var showingNotificationSettings = false
     @State private var showingImageQualitySettings = false
+
+    init(legalDocumentOpener: LegalDocumentOpening = LegalDocumentOpener.shared) {
+        self.legalDocumentOpener = legalDocumentOpener
+    }
     
     var body: some View {
         NavigationView {
@@ -109,17 +115,17 @@ struct SettingsView: View {
                         title: "Termos de Uso",
                         subtitle: "Termos e condições",
                         action: {
-                            // TODO: Abrir termos de uso
+                            legalDocumentOpener.open(.termsOfUse)
                         }
                     )
-                    
+
                     SettingsRow(
                         icon: "hand.raised",
                         iconColor: DesignSystem.Colors.textSecondary,
                         title: "Política de Privacidade",
                         subtitle: "Como protegemos seus dados",
                         action: {
-                            // TODO: Abrir política de privacidade
+                            legalDocumentOpener.open(.privacyPolicy)
                         }
                     )
                 }
@@ -212,6 +218,31 @@ struct SettingsRow: View {
     }
 }
 
-#Preview {
+#Preview("Configurações") {
     SettingsView()
 }
+
+#if DEBUG
+private struct SettingsViewPreviewContainer: View {
+    @StateObject private var legalOpener = PreviewLegalDocumentOpener()
+
+    var body: some View {
+        SettingsView(legalDocumentOpener: legalOpener)
+            .overlay(alignment: .bottom) {
+                if let document = legalOpener.lastOpenedDocument {
+                    PreviewLegalDocumentBanner(title: document.localizedTitle)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .padding()
+                }
+            }
+            .overlay(alignment: .top) {
+                PreviewInstructionLabel(text: "Toque nos links de Termos ou Privacidade para validar a prévia.")
+            }
+            .animation(.easeInOut, value: legalOpener.lastOpenedDocument)
+    }
+}
+
+#Preview("Configurações • Ações Legais") {
+    SettingsViewPreviewContainer()
+}
+#endif
