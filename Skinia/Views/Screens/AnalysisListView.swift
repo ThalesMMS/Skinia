@@ -32,6 +32,7 @@ struct AnalysisListView: View {
     @State private var isSelectionMode = false
     @StateObject private var sheetState = SheetState()
     @State private var activeAlert: AlertContext?
+    @State private var showingDeleteConfirmation = false
 
     init(
         coordinator: AnalysisListCoordinator,
@@ -82,7 +83,8 @@ struct AnalysisListView: View {
                             }
 
                             Button("Excluir Selecionadas", role: .destructive) {
-                                deleteSelectedPhotos()
+                                HapticManager.shared.selection()
+                                showingDeleteConfirmation = true
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
@@ -147,6 +149,22 @@ struct AnalysisListView: View {
                         viewModel.clearErrorMessage()
                     }
                 )
+            }
+            .confirmationDialog(
+                "Confirmar exclusão",
+                isPresented: $showingDeleteConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("Excluir", role: .destructive) {
+                    HapticManager.shared.impact(.medium)
+                    deleteSelectedPhotos()
+                }
+
+                Button("Cancelar", role: .cancel) {
+                    HapticManager.shared.selection()
+                }
+            } message: {
+                Text("Esta ação é irreversível. As análises selecionadas serão removidas permanentemente.")
             }
         }
         .onAppear {
