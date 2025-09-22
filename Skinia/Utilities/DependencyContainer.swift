@@ -10,6 +10,7 @@ protocol DependencyContainerProtocol {
     var networkService: any NetworkServiceProtocol { get }
     var analysisExportService: any AnalysisExportServiceProtocol { get }
     var shareSheetPresenter: ShareSheetPresenter { get }
+    var notificationScheduler: any NotificationSchedulerProtocol { get }
 
     // Storage
     var modelContainer: ModelContainer { get }
@@ -21,6 +22,7 @@ final class DependencyContainer: DependencyContainerProtocol {
     // MARK: - Managers
     let notificationManager = NotificationManager()
     let shareSheetPresenter = ShareSheetPresenter()
+    lazy var notificationScheduler: any NotificationSchedulerProtocol = NotificationScheduler()
 
     // MARK: - Storage
     lazy var modelContainer: ModelContainer = {
