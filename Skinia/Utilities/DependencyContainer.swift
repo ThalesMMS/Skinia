@@ -55,8 +55,8 @@ final class DependencyContainer: DependencyContainerProtocol {
         analysisService: analysisService,
         notificationManager: notificationManager
     )
-    
-    lazy var networkService: any NetworkServiceProtocol = NetworkService()
+
+    lazy var networkService: any NetworkServiceProtocol = RemoteAnalysisNetworkService()
     
     // MARK: - Singleton
     static let shared = DependencyContainer()
@@ -83,7 +83,10 @@ protocol CameraServiceProtocol {
 
 @MainActor
 protocol NetworkServiceProtocol {
-    // Será implementado quando criarmos os serviços de rede
+    func submitAnalysis(imageData: Data, metadata: PhotoMetadata?) async throws -> NetworkAnalysisSubmission
+    func fetchAnalysisStatus(for analysisId: String) async throws -> RemoteAnalysisStatus
+    func fetchAnalysisResult(for analysisId: String) async throws -> AnalysisResult
+    func cancelAnalysis(for analysisId: String) async throws
 }
 
 // MARK: - Mock Implementations for now
@@ -93,57 +96,64 @@ final class AnalysisService: AnalysisServiceProtocol {
     private let networkService: any NetworkServiceProtocol
     private let photoRepository: any PhotoRepositoryProtocol
     private var activeAnalyses: [UUID: AnalysisProgress] = [:]
-    private var analysisTasks: [UUID: Task<Void, Error>] = [:]
+    private var analysisTasks: [UUID: Task<Void, Never>] = [:]
+    private var remoteAnalysisIds: [UUID: String] = [:]
     private let notificationManager: NotificationManager
-    
+
     init(networkService: any NetworkServiceProtocol, photoRepository: any PhotoRepositoryProtocol, notificationManager: NotificationManager) {
         self.networkService = networkService
         self.photoRepository = photoRepository
         self.notificationManager = notificationManager
     }
-    
+
     func startAnalysis(for photo: SkinLesionPhoto) async throws {
         // Cancel any existing analysis for this photo
         if let existingTask = analysisTasks[photo.id] {
             existingTask.cancel()
             analysisTasks.removeValue(forKey: photo.id)
         }
-        
+
         // Create progress tracker
         let progress = AnalysisProgress(photoId: photo.id)
         activeAnalyses[photo.id] = progress
-        
+
         // Update photo status
         photo.analysisStatus = .uploading
         try photoRepository.update(photo)
-        
+
         // Show start notification
         notificationManager.show(
             title: "Análise Iniciada",
             message: "Processando sua imagem...",
             type: .info
         )
-        
+
         // Start analysis task
-        let task = Task<Void, Error> {
+        let task = Task<Void, Never> {
             await performAnalysis(for: photo, progress: progress)
         }
         analysisTasks[photo.id] = task
-        
+
         // Await the analysis
-        try await task.value
+        await task.value
     }
-    
+
     func getAnalysisProgress(for photoId: UUID) -> AnalysisProgress? {
         return activeAnalyses[photoId]
     }
-    
+
     func cancelAnalysis(for photoId: UUID) async {
-        // Cancel the task
         analysisTasks[photoId]?.cancel()
         analysisTasks.removeValue(forKey: photoId)
 
-        // Remove progress tracker
+        if let remoteId = remoteAnalysisIds.removeValue(forKey: photoId) {
+            do {
+                try await networkService.cancelAnalysis(for: remoteId)
+            } catch {
+                print("AnalysisService.cancelAnalysis - failed to cancel remote analysis: \(error)")
+            }
+        }
+
         activeAnalyses.removeValue(forKey: photoId)
 
         // Attempt to restore photo status
@@ -173,115 +183,100 @@ final class AnalysisService: AnalysisServiceProtocol {
             )
         }
     }
-    
+
     func retryAnalysis(for photo: SkinLesionPhoto) async throws {
         photo.analysisStatus = .pending
         photo.analysisResult = nil
         try photoRepository.update(photo)
+        remoteAnalysisIds.removeValue(forKey: photo.id)
         try await startAnalysis(for: photo)
     }
-    
+
     private func performAnalysis(for photo: SkinLesionPhoto, progress: AnalysisProgress) async {
         do {
-            // Determine mock scenario
-            let scenario = MockAnalysisEngine.determineScenario(
-                from: photo.imageData,
-                bodyLocation: photo.metadata?.bodyLocation
-            )
-            
-            // Check for simulated failure
-            if MockAnalysisEngine.shouldSimulateFailure(for: scenario) {
-                try await Task.sleep(for: .seconds(Double.random(in: 2.0...8.0)))
-                await handleAnalysisFailure(for: photo, progress: progress)
-                return
-            }
-            
-            // Get analysis duration
-            let totalDuration = MockAnalysisEngine.getVariableAnalysisTime(for: scenario)
-            let progressCurve = MockAnalysisEngine.generateRealisticProgressCurve(for: totalDuration)
-            
-            // Execute analysis with realistic progress updates
-            for (index, (timePoint, progressValue)) in progressCurve.enumerated() {
-                // Check for cancellation
-                try Task.checkCancellation()
-                
-                // Sleep until next progress point
-                if index > 0 {
-                    let previousTime = progressCurve[index - 1].0
-                    let sleepDuration = timePoint - previousTime
-                    try await Task.sleep(for: .seconds(sleepDuration))
-                }
-                
-                // Update progress and photo status
-                await updateAnalysisProgress(
-                    for: photo,
-                    progress: progress,
-                    progressValue: progressValue,
-                    remainingTime: totalDuration - timePoint
+            let submission = try await networkService.submitAnalysis(imageData: photo.imageData, metadata: photo.metadata)
+            remoteAnalysisIds[photo.id] = submission.analysisId
+
+            if let initialStatus = submission.initialStatus {
+                updateAnalysisProgress(for: photo, progress: progress, with: initialStatus)
+            } else {
+                progress.updateProgress(
+                    stage: .uploading,
+                    stageProgress: 0.1,
+                    overallProgress: 0.1,
+                    estimatedTimeRemaining: submission.estimatedTime
                 )
+                do {
+                    try photoRepository.update(photo)
+                } catch {
+                    print("AnalysisService.performAnalysis - failed to update photo: \(error)")
+                }
             }
-            
-            // Complete analysis
-            await completeAnalysis(for: photo, progress: progress, result: scenario.analysisResult)
-            
+
+            try await pollAnalysis(for: photo, progress: progress, analysisId: submission.analysisId)
         } catch is CancellationError {
-            // Analysis was cancelled
             await handleAnalysisCancellation(for: photo, progress: progress)
         } catch {
-            // Unexpected error
             await handleAnalysisFailure(for: photo, progress: progress, error: error)
         }
     }
-    
-    private func updateAnalysisProgress(for photo: SkinLesionPhoto, progress: AnalysisProgress, progressValue: Double, remainingTime: TimeInterval) async {
-        // Determine current stage based on progress
-        let stage: AnalysisStage
-        let stageProgress: Double
-        
-        switch progressValue {
-        case 0.0..<0.15:
-            stage = .uploading
-            stageProgress = progressValue / 0.15
-            photo.analysisStatus = .uploading
-        case 0.15..<0.25:
-            stage = .preprocessing
-            stageProgress = (progressValue - 0.15) / 0.10
-            photo.analysisStatus = .analyzing
-        case 0.25..<0.90:
-            stage = .analyzing
-            stageProgress = (progressValue - 0.25) / 0.65
-            photo.analysisStatus = .analyzing
-        case 0.90..<1.0:
-            stage = .postprocessing
-            stageProgress = (progressValue - 0.90) / 0.10
-            photo.analysisStatus = .analyzing
-        default:
-            stage = .completed
-            stageProgress = 1.0
-            photo.analysisStatus = .completed
+
+    private func pollAnalysis(for photo: SkinLesionPhoto, progress: AnalysisProgress, analysisId: String) async throws {
+        while true {
+            try Task.checkCancellation()
+
+            let status = try await networkService.fetchAnalysisStatus(for: analysisId)
+            updateAnalysisProgress(for: photo, progress: progress, with: status)
+
+            if status.isFailed {
+                await handleAnalysisFailure(for: photo, progress: progress, message: status.errorMessage)
+                return
+            }
+
+            if status.isCompleted {
+                let result = try await networkService.fetchAnalysisResult(for: analysisId)
+                await completeAnalysis(for: photo, progress: progress, result: result)
+                return
+            }
+
+            let safeInterval = min(max(0.5, status.suggestedRetryInterval), 30.0)
+            let nanoseconds = UInt64((safeInterval * 1_000_000_000).rounded())
+            try await Task.sleep(nanoseconds: nanoseconds)
         }
-        
-        // Update progress
-        progress.updateProgress(
-            stage: stage,
-            stageProgress: stageProgress,
-            overallProgress: progressValue,
-            estimatedTimeRemaining: remainingTime > 0 ? remainingTime : nil
-        )
-        
-        // Update photo in repository
-        try? photoRepository.update(photo)
     }
-    
+
+    private func updateAnalysisProgress(for photo: SkinLesionPhoto, progress: AnalysisProgress, with status: RemoteAnalysisStatus) {
+        if status.isFailed {
+            progress.setError(status.errorMessage ?? "Falha na análise da imagem.")
+        } else {
+            progress.clearError()
+        }
+
+        progress.updateProgress(
+            stage: status.stage,
+            stageProgress: status.stageProgress,
+            overallProgress: status.overallProgress,
+            estimatedTimeRemaining: status.estimatedTimeRemaining
+        )
+
+        photo.analysisStatus = status.status
+
+        do {
+            try photoRepository.update(photo)
+        } catch {
+            print("AnalysisService.updateAnalysisProgress - failed to update photo: \(error)")
+        }
+    }
+
     private func completeAnalysis(for photo: SkinLesionPhoto, progress: AnalysisProgress, result: AnalysisResult) async {
         // Set final progress
         progress.updateProgress(stage: .completed, stageProgress: 1.0, overallProgress: 1.0)
-        
+
         // Update photo with results
         photo.analysisStatus = .completed
         photo.analysisResult = result
         try? photoRepository.update(photo)
-        
+
         // Show completion notification
         notificationManager.show(
             title: "Análise Concluída",
@@ -289,47 +284,34 @@ final class AnalysisService: AnalysisServiceProtocol {
             type: .success,
             duration: 4.0
         )
-        
+
         // Clean up
         activeAnalyses.removeValue(forKey: photo.id)
         analysisTasks.removeValue(forKey: photo.id)
+        remoteAnalysisIds.removeValue(forKey: photo.id)
     }
-    
-    private func handleAnalysisFailure(for photo: SkinLesionPhoto, progress: AnalysisProgress, error: Error? = nil) async {
-        let errorMessages = [
-            "Falha na comunicação com o servidor",
-            "Imagem com qualidade insuficiente para análise",
-            "Servidor de análise temporariamente indisponível",
-            "Erro interno do sistema de IA",
-            "Timeout na análise - tente novamente"
-        ]
-        
-        let errorMessage = error?.localizedDescription ?? errorMessages.randomElement()!
-        
-        // Update progress with error
-        progress.updateProgress(stage: .failed, stageProgress: 0.0, overallProgress: 0.0)
+
+    private func handleAnalysisFailure(for photo: SkinLesionPhoto, progress: AnalysisProgress, error: Error? = nil, message: String? = nil) async {
+        let errorMessage = message ?? error?.localizedDescription ?? "Falha na análise. Tente novamente mais tarde."
+
+        progress.updateProgress(stage: .failed, stageProgress: 0.0, overallProgress: progress.overallProgress)
         progress.setError(errorMessage)
-        
-        // Update photo status
+
         photo.analysisStatus = .failed
         try? photoRepository.update(photo)
-        
-        // Show failure notification
+
         notificationManager.show(
             title: "Erro na Análise",
             message: errorMessage,
             type: .error,
             duration: 5.0
         )
-        
-        // Clean up after delay
-        Task {
-            try await Task.sleep(for: .seconds(5.0))
-            activeAnalyses.removeValue(forKey: photo.id)
-            analysisTasks.removeValue(forKey: photo.id)
-        }
+
+        activeAnalyses.removeValue(forKey: photo.id)
+        analysisTasks.removeValue(forKey: photo.id)
+        remoteAnalysisIds.removeValue(forKey: photo.id)
     }
-    
+
     private func handleAnalysisCancellation(for photo: SkinLesionPhoto, progress: AnalysisProgress) async {
         // Show cancellation notification
         notificationManager.show(
@@ -337,10 +319,11 @@ final class AnalysisService: AnalysisServiceProtocol {
             message: "O processamento foi interrompido",
             type: .warning
         )
-        
+
         // Clean up immediately
         activeAnalyses.removeValue(forKey: photo.id)
         analysisTasks.removeValue(forKey: photo.id)
+        remoteAnalysisIds.removeValue(forKey: photo.id)
     }
 }
 
@@ -405,9 +388,4 @@ final class CameraService: CameraServiceProtocol {
         let permissionManager = CameraPermissionManager()
         return await permissionManager.requestPermission()
     }
-}
-
-@MainActor
-final class NetworkService: NetworkServiceProtocol {
-    init() {}
 }
