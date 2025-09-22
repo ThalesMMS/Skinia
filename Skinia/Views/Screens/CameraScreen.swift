@@ -22,11 +22,12 @@ struct CameraScreen: View {
     @State private var selectedPhotoItem: PhotosPickerItem?
     @State private var isProcessingPhotoSelection = false
     @State private var isLoadingPhoto = false
-    
+    @State private var saveError: Error?
+
     init(coordinator: CameraCoordinator) {
         self._coordinator = StateObject(wrappedValue: coordinator)
     }
-    
+
     
     var body: some View {
         Group {
@@ -87,6 +88,32 @@ struct CameraScreen: View {
                     }
                 )
             }
+        }
+        .alert(
+            "Não foi possível salvar a foto",
+            isPresented: Binding(
+                get: { saveError != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        saveError = nil
+                    }
+                }
+            )
+        ) {
+            Button("Tentar novamente") {
+                let errorExists = saveError != nil
+                saveError = nil
+                if errorExists {
+                    Task {
+                        await savePhoto()
+                    }
+                }
+            }
+            Button("Cancelar", role: .cancel) {
+                saveError = nil
+            }
+        } message: {
+            Text("Ocorreu um problema ao salvar sua foto. Verifique sua conexão e tente novamente.")
         }
     }
     
@@ -319,8 +346,7 @@ struct CameraScreen: View {
         } catch {
             await MainActor.run {
                 isSaving = false
-                // TODO: Show error alert
-                print("Error saving photo: \(error)")
+                saveError = error
             }
         }
     }
