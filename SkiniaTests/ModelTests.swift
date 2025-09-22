@@ -104,24 +104,53 @@ struct ModelTests {
     
     @Test func skinLesionPhotoStatusProperties() {
         let photo = SkinLesionPhoto(imageData: Data(), analysisStatus: .pending)
-        
+
         #expect(photo.isPendingAnalysis == true)
         #expect(photo.isAnalysisComplete == false)
         #expect(photo.hasError == false)
-        
+
         photo.updateStatus(.completed)
         // Note: isAnalysisComplete requires analysisResult to be non-nil
         #expect(photo.isPendingAnalysis == false)
         #expect(photo.hasError == false)
-        
+
         photo.updateStatus(.failed)
         #expect(photo.hasError == true)
     }
-    
+
+    @Test func skinLesionPhotoFormattedDatesReuseSharedFormatter() {
+        let originalTimeZone = TimeZone.ReferenceType.default
+        let saoPauloTimeZone = TimeZone(secondsFromGMT: -3 * 3600)!
+        TimeZone.ReferenceType.default = saoPauloTimeZone
+        defer { TimeZone.ReferenceType.default = originalTimeZone }
+
+        var components = DateComponents()
+        components.year = 2024
+        components.month = 5
+        components.day = 10
+        components.hour = 15
+        components.minute = 45
+        components.second = 0
+        components.timeZone = saoPauloTimeZone
+
+        let calendar = Calendar(identifier: .gregorian)
+        let captureDate = calendar.date(from: components)!
+        let photo = SkinLesionPhoto(imageData: Data(), captureDate: captureDate)
+
+        #expect(photo.formattedCaptureDate == "10 de mai. de 2024, 15:45")
+        #expect(photo.shortCaptureDate == "10/05/2024")
+
+        let firstIdentifiers = SkinLesionPhoto.testingFormatterIdentifiers()
+        let secondIdentifiers = SkinLesionPhoto.testingFormatterIdentifiers()
+
+        #expect(firstIdentifiers.full == secondIdentifiers.full)
+        #expect(firstIdentifiers.short == secondIdentifiers.short)
+    }
+
     @Test func skinLesionPhotoDaysSinceCapture() {
         let yesterday = Calendar.current.date(byAdding: .day, value: -1, to: Date())!
         let photo = SkinLesionPhoto(imageData: Data(), captureDate: yesterday)
-        
+
         #expect(photo.daysSinceCapture == 1)
     }
     

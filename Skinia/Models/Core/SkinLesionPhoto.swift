@@ -54,27 +54,35 @@ final class SkinLesionPhoto {
 }
 
 extension SkinLesionPhoto {
-    var thumbnailImage: UIImage? {
-        return UIImage(data: imageData)
-    }
-    
-    var fullImage: UIImage? {
-        return UIImage(data: imageData)
-    }
-    
-    var formattedCaptureDate: String {
+    private static let fullDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .medium
         formatter.timeStyle = .short
         formatter.locale = Locale(identifier: "pt_BR")
-        return formatter.string(from: captureDate)
-    }
-    
-    var shortCaptureDate: String {
+        return formatter
+    }()
+
+    private static let shortDateFormatter: DateFormatter = {
         let formatter = DateFormatter()
         formatter.dateStyle = .short
         formatter.locale = Locale(identifier: "pt_BR")
-        return formatter.string(from: captureDate)
+        return formatter
+    }()
+
+    var thumbnailImage: UIImage? {
+        return UIImage(data: imageData)
+    }
+
+    var fullImage: UIImage? {
+        return UIImage(data: imageData)
+    }
+
+    var formattedCaptureDate: String {
+        return Self.fullDateFormatter.string(from: captureDate)
+    }
+
+    var shortCaptureDate: String {
+        return Self.shortDateFormatter.string(from: captureDate)
     }
     
     var isAnalysisComplete: Bool {
@@ -115,3 +123,11 @@ extension SkinLesionPhoto {
         return analysisResult?.riskLevel
     }
 }
+
+#if DEBUG
+extension SkinLesionPhoto {
+    static func testingFormatterIdentifiers() -> (full: ObjectIdentifier, short: ObjectIdentifier) {
+        (ObjectIdentifier(fullDateFormatter), ObjectIdentifier(shortDateFormatter))
+    }
+}
+#endif
