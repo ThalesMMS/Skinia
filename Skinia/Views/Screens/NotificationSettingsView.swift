@@ -8,9 +8,15 @@ struct NotificationSettingsView: View {
     @AppStorage("reminderNotifications") private var reminderNotifications = false
     @AppStorage("urgentResultNotifications") private var urgentResultNotifications = true
     @AppStorage("reminderFrequency") private var reminderFrequency = ReminderFrequency.monthly.rawValue
-    
+
     @State private var notificationAuthorizationStatus: UNAuthorizationStatus = .notDetermined
     @State private var showingPermissionAlert = false
+
+    private let notificationScheduler: any NotificationSchedulerProtocol
+
+    init(notificationScheduler: any NotificationSchedulerProtocol = DependencyContainer.shared.notificationScheduler) {
+        self.notificationScheduler = notificationScheduler
+    }
     
     var body: some View {
         NavigationView {
@@ -39,50 +45,81 @@ struct NotificationSettingsView: View {
                     .toggleStyle(SwitchToggleStyle(tint: DesignSystem.Colors.primary))
                     .disabled(notificationAuthorizationStatus == .denied)
                     .onChange(of: notificationsEnabled) { _, newValue in
-                        if newValue && notificationAuthorizationStatus == .notDetermined {
-                            requestNotificationPermission()
-                        }
+                        handleGeneralNotificationToggleChange(isEnabled: newValue)
+                    }
+
+                    if !notificationsEnabled && notificationAuthorizationStatus == .authorized {
+                        Text("As notificações específicas permanecerão desativadas até você reativar esta opção.")
+                            .font(DesignSystem.Typography.caption)
+                            .foregroundStyle(DesignSystem.Colors.textSecondary)
+                            .padding(.top, DesignSystem.Spacing.xs)
                     }
                 }
-                
+
                 // Analysis Notifications
                 Section("Notificações de Análise") {
                     NotificationToggleRow(
                         isOn: $analysisCompleteNotifications,
                         title: "Análise Concluída",
-                        subtitle: "Quando o resultado da análise estiver pronto",
+                        subtitle: notificationsEnabled
+                            ? "Quando o resultado da análise estiver pronto"
+                            : "Ative as notificações gerais para receber este alerta",
                         icon: "checkmark.circle",
                         iconColor: DesignSystem.Colors.success,
                         isEnabled: notificationsEnabled && notificationAuthorizationStatus == .authorized
                     )
-                    
+                    .onChange(of: analysisCompleteNotifications) { _, newValue in
+                        Task {
+                            await handleAnalysisToggleChange(isEnabled: newValue)
+                        }
+                    }
+
                     NotificationToggleRow(
                         isOn: $urgentResultNotifications,
                         title: "Resultados Urgentes",
-                        subtitle: "Para análises que indicam alto risco",
+                        subtitle: notificationsEnabled
+                            ? "Para análises que indicam alto risco"
+                            : "Ative as notificações gerais para receber alertas críticos",
                         icon: "exclamationmark.triangle",
                         iconColor: DesignSystem.Colors.error,
                         isEnabled: notificationsEnabled && notificationAuthorizationStatus == .authorized
                     )
+                    .onChange(of: urgentResultNotifications) { _, newValue in
+                        Task {
+                            await handleUrgentToggleChange(isEnabled: newValue)
+                        }
+                    }
                 }
-                
+
                 // Reminder Notifications
                 Section("Lembretes") {
                     NotificationToggleRow(
                         isOn: $reminderNotifications,
                         title: "Lembretes de Monitoramento",
-                        subtitle: "Para acompanhar lesões regularmente",
+                        subtitle: notificationsEnabled
+                            ? "Para acompanhar lesões regularmente"
+                            : "Ative as notificações gerais para receber lembretes",
                         icon: "bell.badge",
                         iconColor: DesignSystem.Colors.warning,
                         isEnabled: notificationsEnabled && notificationAuthorizationStatus == .authorized
                     )
-                    
+                    .onChange(of: reminderNotifications) { _, newValue in
+                        Task {
+                            await handleReminderToggleChange(isEnabled: newValue)
+                        }
+                    }
+
                     if reminderNotifications {
                         ReminderFrequencyPicker(selectedFrequency: Binding(
                             get: { ReminderFrequency(rawValue: reminderFrequency) ?? .monthly },
                             set: { reminderFrequency = $0.rawValue }
                         ))
                         .disabled(!notificationsEnabled || notificationAuthorizationStatus != .authorized)
+                        .onChange(of: reminderFrequency) { _, _ in
+                            Task {
+                                await rescheduleReminderIfNeeded()
+                            }
+                        }
                     }
                 }
                 
@@ -130,19 +167,28 @@ struct NotificationSettingsView: View {
         UNUserNotificationCenter.current().getNotificationSettings { settings in
             DispatchQueue.main.async {
                 self.notificationAuthorizationStatus = settings.authorizationStatus
+                Task {
+                    await rescheduleNotificationsIfNeeded()
+                }
             }
         }
     }
-    
+
     private func requestNotificationPermission() {
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { granted, error in
             DispatchQueue.main.async {
                 if granted {
                     self.notificationAuthorizationStatus = .authorized
+                    Task {
+                        await rescheduleNotificationsIfNeeded()
+                    }
                 } else {
                     self.notificationAuthorizationStatus = .denied
                     self.notificationsEnabled = false
                     self.showingPermissionAlert = true
+                    Task {
+                        await notificationScheduler.cancelAllNotifications()
+                    }
                 }
             }
         }
@@ -157,29 +203,84 @@ struct NotificationSettingsView: View {
             UIApplication.shared.open(settingsUrl)
         }
     }
-}
 
-// MARK: - Reminder Frequency
-
-enum ReminderFrequency: String, CaseIterable {
-    case weekly = "weekly"
-    case monthly = "monthly"
-    case quarterly = "quarterly"
-    
-    var title: String {
-        switch self {
-        case .weekly: return "Semanal"
-        case .monthly: return "Mensal"
-        case .quarterly: return "Trimestral"
+    @MainActor
+    private func handleGeneralNotificationToggleChange(isEnabled: Bool) {
+        if isEnabled {
+            if notificationAuthorizationStatus == .notDetermined {
+                requestNotificationPermission()
+            } else {
+                Task {
+                    await rescheduleNotificationsIfNeeded()
+                }
+            }
+        } else {
+            Task {
+                await notificationScheduler.cancelAllNotifications()
+            }
         }
     }
-    
-    var description: String {
-        switch self {
-        case .weekly: return "A cada 7 dias"
-        case .monthly: return "A cada 30 dias"
-        case .quarterly: return "A cada 3 meses"
+
+    @MainActor
+    private func handleAnalysisToggleChange(isEnabled: Bool) async {
+        guard notificationAuthorizationStatus == .authorized else {
+            await notificationScheduler.updateAnalysisResultNotifications(isEnabled: false)
+            return
         }
+
+        if notificationsEnabled {
+            await notificationScheduler.updateAnalysisResultNotifications(isEnabled: isEnabled)
+        } else {
+            await notificationScheduler.updateAnalysisResultNotifications(isEnabled: false)
+        }
+    }
+
+    @MainActor
+    private func handleUrgentToggleChange(isEnabled: Bool) async {
+        guard notificationAuthorizationStatus == .authorized else {
+            await notificationScheduler.updateUrgentResultNotifications(isEnabled: false)
+            return
+        }
+
+        if notificationsEnabled {
+            await notificationScheduler.updateUrgentResultNotifications(isEnabled: isEnabled)
+        } else {
+            await notificationScheduler.updateUrgentResultNotifications(isEnabled: false)
+        }
+    }
+
+    @MainActor
+    private func handleReminderToggleChange(isEnabled: Bool) async {
+        guard notificationAuthorizationStatus == .authorized else {
+            await notificationScheduler.updateReminderNotifications(isEnabled: false, frequency: currentReminderFrequency())
+            return
+        }
+
+        if notificationsEnabled {
+            await notificationScheduler.updateReminderNotifications(isEnabled: isEnabled, frequency: currentReminderFrequency())
+        } else {
+            await notificationScheduler.updateReminderNotifications(isEnabled: false, frequency: currentReminderFrequency())
+        }
+    }
+
+    @MainActor
+    private func rescheduleReminderIfNeeded() async {
+        guard notificationsEnabled, reminderNotifications, notificationAuthorizationStatus == .authorized else { return }
+        await notificationScheduler.updateReminderNotifications(isEnabled: true, frequency: currentReminderFrequency())
+    }
+
+    @MainActor
+    private func rescheduleNotificationsIfNeeded() async {
+        guard notificationsEnabled, notificationAuthorizationStatus == .authorized else { return }
+
+        await notificationScheduler.updateAnalysisResultNotifications(isEnabled: analysisCompleteNotifications)
+        await notificationScheduler.updateUrgentResultNotifications(isEnabled: urgentResultNotifications)
+        await notificationScheduler.updateReminderNotifications(isEnabled: reminderNotifications, frequency: currentReminderFrequency())
+    }
+
+    @MainActor
+    private func currentReminderFrequency() -> ReminderFrequency {
+        ReminderFrequency(rawValue: reminderFrequency) ?? .monthly
     }
 }
 
