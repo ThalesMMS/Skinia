@@ -74,6 +74,10 @@ final class AnalysisListViewModel {
         searchText = ""
         filterPhotos()
     }
+
+    func clearErrorMessage() {
+        errorMessage = nil
+    }
     
     // MARK: - Computed Properties
     var hasPhotos: Bool {

@@ -27,7 +27,11 @@ final class AnalysisListCoordinator: NavigationCoordinator, ObservableObject {
     
     @ViewBuilder
     func build() -> some View {
-        AnalysisListView(coordinator: self)
+        AnalysisListView(
+            coordinator: self,
+            exportService: dependencyContainer.analysisExportService,
+            shareSheetPresenter: dependencyContainer.shareSheetPresenter
+        )
     }
     
     // MARK: - Navigation Methods

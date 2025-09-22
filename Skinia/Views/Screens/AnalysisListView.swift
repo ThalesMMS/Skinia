@@ -18,17 +18,27 @@ class SheetState: ObservableObject {
 }
 
 struct AnalysisListView: View {
+    private let exportService: any AnalysisExportServiceProtocol
+    private let shareSheetPresenter: ShareSheetPresenter
+
     @State private var viewModel: AnalysisListViewModel
     @StateObject private var coordinator: AnalysisListCoordinator
-    
+
     @State private var showingFilterSheet = false
     @State private var showingSearchField = false
     @State private var showingHistoryOptions = false
     @State private var showingBatchActions = false
     @State private var selectedPhotos = Set<UUID>()
     @StateObject private var sheetState = SheetState()
-    
-    init(coordinator: AnalysisListCoordinator) {
+    @State private var activeAlert: AlertContext?
+
+    init(
+        coordinator: AnalysisListCoordinator,
+        exportService: any AnalysisExportServiceProtocol,
+        shareSheetPresenter: ShareSheetPresenter
+    ) {
+        self.exportService = exportService
+        self.shareSheetPresenter = shareSheetPresenter
         self._coordinator = StateObject(wrappedValue: coordinator)
         self._viewModel = State(wrappedValue: AnalysisListViewModel(
             photoRepository: coordinator.dependencyContainer.photoRepository
@@ -122,14 +132,15 @@ struct AnalysisListView: View {
             .sheet(isPresented: $showingHistoryOptions) {
                 HistoryOptionsSheet(viewModel: viewModel)
             }
-            .alert("Erro", isPresented: .constant(viewModel.errorMessage != nil)) {
-                Button("OK") {
-                    // Clear error
-                }
-            } message: {
-                if let error = viewModel.errorMessage {
-                    Text(error)
-                }
+            .alert(item: $activeAlert) { alert in
+                Alert(
+                    title: Text(alert.title),
+                    message: Text(alert.message),
+                    dismissButton: .default(Text("OK")) {
+                        activeAlert = nil
+                        viewModel.clearErrorMessage()
+                    }
+                )
             }
         }
         .onAppear {
@@ -152,9 +163,14 @@ struct AnalysisListView: View {
                 }
             }
         }
+        .onChange(of: viewModel.errorMessage) { _, message in
+            if let message {
+                activeAlert = AlertContext(title: "Erro", message: message)
+            }
+        }
         .sheet(isPresented: $sheetState.isShowing) {
             let _ = print("🔍 Sheet building - isShowing: \(sheetState.isShowing), selectedPhoto: \(sheetState.selectedPhoto?.id.uuidString ?? "nil")")
-            
+
             if let photoToShow = sheetState.selectedPhoto {
                 let _ = print("🔍 Sheet presenting AnalysisDetailView for photo: \(photoToShow.id)")
                 NavigationView {
@@ -293,16 +309,15 @@ struct AnalysisListView: View {
     
     private func exportSelectedPhotos() {
         let photosToExport = viewModel.getAllPhotos.filter { selectedPhotos.contains($0.id) }
-        // TODO: Implement export functionality
-        print("Exporting \(photosToExport.count) selected photos")
-        selectedPhotos.removeAll()
+        if performExport(photos: photosToExport, format: .pdf, emptyMessage: "Selecione ao menos uma foto para exportar.") {
+            selectedPhotos.removeAll()
+        }
     }
-    
+
     private func exportAllPhotos() {
-        // TODO: Implement export all functionality
-        print("Exporting all \(viewModel.getAllPhotos.count) photos")
+        _ = performExport(photos: viewModel.getAllPhotos, format: .pdf, emptyMessage: "Nenhuma foto disponível para exportação.")
     }
-    
+
     private func deleteSelectedPhotos() {
         let photosToDelete = viewModel.getAllPhotos.filter { selectedPhotos.contains($0.id) }
         for photo in photosToDelete {
@@ -310,9 +325,71 @@ struct AnalysisListView: View {
         }
         selectedPhotos.removeAll()
     }
+
+    @discardableResult
+    private func performExport(
+        photos: [SkinLesionPhoto],
+        format: AnalysisExportFormat,
+        emptyMessage: String
+    ) -> Bool {
+        guard !photos.isEmpty else {
+            activeAlert = AlertContext(
+                title: "Nenhuma foto disponível",
+                message: emptyMessage
+            )
+            return false
+        }
+
+        do {
+            let fileURL = try exportService.exportPhotos(photos, format: format)
+            shareSheetPresenter.present(items: [fileURL])
+            return true
+        } catch {
+            activeAlert = AlertContext(
+                title: "Erro ao exportar",
+                message: error.localizedDescription
+            )
+            return false
+        }
+    }
+
+    private func shareStatisticsSummary() {
+        let photos = viewModel.getAllPhotos
+
+        guard !photos.isEmpty else {
+            activeAlert = AlertContext(
+                title: "Sem dados",
+                message: "Cadastre análises para compartilhar estatísticas."
+            )
+            return
+        }
+
+        let total = photos.count
+        let completed = photos.filter { $0.analysisStatus == .completed }.count
+        let pending = photos.filter { $0.isPendingAnalysis }.count
+        let failed = photos.filter { $0.hasError }.count
+        let highRisk = photos.filter { $0.analysisResult?.riskLevel == .high || $0.analysisResult?.riskLevel == .urgent }.count
+
+        let summary = """
+        Estatísticas de Análises
+        Total de fotos: \(total)
+        Concluídas: \(completed)
+        Em andamento: \(pending)
+        Com erro: \(failed)
+        Alto ou urgente risco: \(highRisk)
+        """
+
+        shareSheetPresenter.present(items: [summary])
+    }
 }
 
 // MARK: - Supporting Views
+
+private struct AlertContext: Identifiable {
+    let id = UUID()
+    let title: String
+    let message: String
+}
 
 private struct LoadingView: View {
     var body: some View {
@@ -585,25 +662,33 @@ private struct HistoryOptionsSheet: View {
             
             VStack(spacing: 8) {
                 Button("Exportar Relatório Completo (PDF)") {
-                    // TODO: Implement PDF export
+                    _ = performExport(
+                        photos: viewModel.getAllPhotos,
+                        format: .pdf,
+                        emptyMessage: "Nenhuma foto disponível para exportação."
+                    )
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(Color.blue)
                 .foregroundColor(.white)
                 .cornerRadius(12)
-                
+
                 Button("Exportar Dados CSV") {
-                    // TODO: Implement CSV export
+                    _ = performExport(
+                        photos: viewModel.getAllPhotos,
+                        format: .csv,
+                        emptyMessage: "Nenhuma foto disponível para exportação."
+                    )
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
                 .background(DesignSystem.Colors.backgroundSecondary)
                 .foregroundColor(.primary)
                 .cornerRadius(12)
-                
+
                 Button("Compartilhar Estatísticas") {
-                    // TODO: Implement sharing
+                    shareStatisticsSummary()
                 }
                 .frame(maxWidth: .infinity)
                 .padding()
@@ -655,5 +740,9 @@ private struct StatCard: View {
     let _ = try? PreviewPhotoFactory.seed(repository: container.photoRepository)
     let coordinator = AnalysisListCoordinator(dependencyContainer: container)
 
-    return AnalysisListView(coordinator: coordinator)
+    return AnalysisListView(
+        coordinator: coordinator,
+        exportService: container.analysisExportService,
+        shareSheetPresenter: container.shareSheetPresenter
+    )
 }
