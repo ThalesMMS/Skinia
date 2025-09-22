@@ -63,22 +63,53 @@ struct StatusNotification: Identifiable, Equatable {
 @Observable
 final class NotificationManager {
     private(set) var notifications: [StatusNotification] = []
-    
+    private var dismissalTasks: [UUID: Task<Void, Never>] = [:]
+
     func show(_ notification: StatusNotification) {
         notifications.append(notification)
+        scheduleAutomaticDismissal(for: notification)
     }
-    
+
     func show(title: String, message: String? = nil, type: StatusNotification.NotificationType, duration: TimeInterval = 3.0) {
         let notification = StatusNotification(title: title, message: message, type: type, duration: duration)
         show(notification)
     }
-    
+
     func dismiss(_ notification: StatusNotification) {
+        cancelDismissalTask(for: notification.id)
         notifications.removeAll { $0.id == notification.id }
     }
-    
+
     func dismissAll() {
+        dismissalTasks.values.forEach { $0.cancel() }
+        dismissalTasks.removeAll()
         notifications.removeAll()
+    }
+
+    private func scheduleAutomaticDismissal(for notification: StatusNotification) {
+        dismissalTasks[notification.id]?.cancel()
+
+        let task = Task { @MainActor [weak self] in
+            let seconds = max(notification.duration, 0)
+            let nanoseconds = UInt64(seconds * 1_000_000_000)
+
+            do {
+                try await Task.sleep(nanoseconds: nanoseconds)
+            } catch {
+                return
+            }
+
+            guard let self, !Task.isCancelled else { return }
+
+            self.dismiss(notification)
+        }
+
+        dismissalTasks[notification.id] = task
+    }
+
+    private func cancelDismissalTask(for id: UUID) {
+        guard let task = dismissalTasks.removeValue(forKey: id) else { return }
+        task.cancel()
     }
 }
 
