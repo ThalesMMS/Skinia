@@ -42,7 +42,12 @@ struct AnalysisListView: View {
                     LoadingView()
                 } else if !viewModel.hasPhotos {
                     EmptyStateView {
-                        viewModel.loadMockData() // For development
+                        do {
+                            try PreviewPhotoFactory.seed(repository: coordinator.dependencyContainer.photoRepository)
+                            viewModel.loadPhotos()
+                        } catch {
+                            print("Falha ao carregar dados de exemplo: \(error)")
+                        }
                     }
                 } else {
                     photosList
@@ -347,7 +352,7 @@ private struct LoadingView: View {
 }
 
 private struct EmptyStateView: View {
-    let onLoadMockData: () -> Void
+    let onLoadSampleData: () -> Void
 
     private let instructionsText = "Capture uma foto da lesão ou importe uma imagem da galeria para iniciar uma nova análise e acompanhar os resultados aqui."
 
@@ -358,7 +363,7 @@ private struct EmptyStateView: View {
             title: "Nenhuma Análise Encontrada",
             subtitle: instructionsText,
             actionTitle: "Carregar Dados de Exemplo",
-            action: onLoadMockData
+            action: onLoadSampleData
         )
 #else
         EnhancedEmptyStateView(
@@ -643,7 +648,8 @@ private struct StatCard: View {
 
 #Preview {
     let container = DependencyContainer.shared
+    let _ = try? PreviewPhotoFactory.seed(repository: container.photoRepository)
     let coordinator = AnalysisListCoordinator(dependencyContainer: container)
-    
+
     return AnalysisListView(coordinator: coordinator)
 }

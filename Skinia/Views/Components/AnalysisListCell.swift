@@ -342,23 +342,13 @@ struct CardButtonStyle: ButtonStyle {
 // MARK: - Preview
 
 #Preview {
-    List {
-        AnalysisListCell(
-            photo: SkinLesionPhoto(
-                imageData: Data(),
-                analysisStatus: .completed
-            )
-        ) {
-            // Action
-        }
-        
-        AnalysisListCell(
-            photo: SkinLesionPhoto(
-                imageData: Data(),
-                analysisStatus: .pending
-            )
-        ) {
-            // Action
+    let photos = PreviewPhotoFactory.makeSamplePhotos()
+
+    return List {
+        ForEach(photos, id: \.id) { photo in
+            AnalysisListCell(photo: photo) {
+                // Action
+            }
         }
     }
 }
