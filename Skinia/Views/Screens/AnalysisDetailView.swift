@@ -2,15 +2,24 @@ import SwiftUI
 
 struct AnalysisDetailView: View {
     let photo: SkinLesionPhoto
-    @Environment(\.analysisService) private var analysisService
+    private let viewModel: AnalysisDetailViewModel
     @Environment(\.notificationManager) private var notificationManager
     @State private var showingShareSheet = false
     @State private var isRetryingAnalysis = false
     @State private var showingFullScreenImage = false
     @State private var showingPatientInfo = false
-    
-    init(photo: SkinLesionPhoto) {
+
+    init(
+        photo: SkinLesionPhoto,
+        photoRepository: any PhotoRepositoryProtocol,
+        analysisService: any AnalysisServiceProtocol
+    ) {
         self.photo = photo
+        self.viewModel = AnalysisDetailViewModel(
+            photo: photo,
+            photoRepository: photoRepository,
+            analysisService: analysisService
+        )
         print("🔍 AnalysisDetailView init for photo: \(photo.id)")
     }
     
@@ -89,7 +98,7 @@ struct AnalysisDetailView: View {
                                 .foregroundColor(DesignSystem.Colors.surface)
                                 .cornerRadius(DesignSystem.CornerRadius.lg)
                             }
-                            .disabled(isRetryingAnalysis)
+                            .disabled(isRetryingAnalysis || !viewModel.canRetryAnalysis)
                         }
                         .padding(DesignSystem.Spacing.lg)
                         .cardStyle()
@@ -510,7 +519,7 @@ struct AnalysisDetailView: View {
                         .foregroundColor(DesignSystem.Colors.surface)
                         .cornerRadius(12)
                     }
-                    .disabled(isRetryingAnalysis)
+                    .disabled(isRetryingAnalysis || !viewModel.canRetryAnalysis)
                 }
                 
                 // Export report button
@@ -627,21 +636,25 @@ struct AnalysisDetailView: View {
     // MARK: - Action Functions
     
     private func retryAnalysis() {
+        guard viewModel.canRetryAnalysis else { return }
+
         Task {
             await MainActor.run {
                 isRetryingAnalysis = true
             }
-            do {
-                try await analysisService.retryAnalysis(for: photo)
-            } catch {
+
+            await viewModel.retryAnalysis()
+
+            if let message = viewModel.errorMessage {
                 await MainActor.run {
                     notificationManager.show(
                         title: "Erro ao Repetir Análise",
-                        message: error.localizedDescription,
+                        message: message,
                         type: .error
                     )
                 }
             }
+
             await MainActor.run {
                 isRetryingAnalysis = false
             }
@@ -936,7 +949,13 @@ struct ShareSheet: UIViewControllerRepresentable {
         analysisStatus: .completed
     )
     
+    let container = DependencyContainer.shared
+
     NavigationView {
-        AnalysisDetailView(photo: mockPhoto)
+        AnalysisDetailView(
+            photo: mockPhoto,
+            photoRepository: container.photoRepository,
+            analysisService: container.analysisService
+        )
     }
 }

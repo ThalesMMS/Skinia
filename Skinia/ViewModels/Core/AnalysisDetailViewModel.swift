@@ -7,13 +7,19 @@ final class AnalysisDetailViewModel {
     
     private(set) var photo: SkinLesionPhoto
     private let photoRepository: any PhotoRepositoryProtocol
+    private let analysisService: any AnalysisServiceProtocol
     
     var isRetrying = false
     var errorMessage: String?
     
-    init(photo: SkinLesionPhoto, photoRepository: any PhotoRepositoryProtocol) {
+    init(
+        photo: SkinLesionPhoto,
+        photoRepository: any PhotoRepositoryProtocol,
+        analysisService: any AnalysisServiceProtocol
+    ) {
         self.photo = photo
         self.photoRepository = photoRepository
+        self.analysisService = analysisService
     }
     
     var canRetryAnalysis: Bool {
@@ -57,15 +63,11 @@ final class AnalysisDetailViewModel {
         errorMessage = nil
         
         do {
-            photo.analysisStatus = .pending
-            try photoRepository.update(photo)
-            
-            // Simulate the analysis process
-            await simulateAnalysisProgress()
+            try await analysisService.retryAnalysis(for: photo)
         } catch {
             errorMessage = "Erro ao reiniciar análise: \(error.localizedDescription)"
         }
-        
+
         isRetrying = false
     }
     
@@ -73,34 +75,4 @@ final class AnalysisDetailViewModel {
         try photoRepository.delete(photo)
     }
     
-    private func simulateAnalysisProgress() async {
-        // Simulate upload
-        photo.analysisStatus = .uploading
-        try? photoRepository.update(photo)
-        try? await Task.sleep(for: .seconds(1))
-        
-        // Simulate analysis
-        photo.analysisStatus = .analyzing
-        try? photoRepository.update(photo)
-        try? await Task.sleep(for: .seconds(2))
-        
-        // Complete with mock result
-        photo.analysisStatus = .completed
-        
-        if photo.analysisResult == nil {
-            let mockResult = AnalysisResult(
-                confidence: Double.random(in: 0.7...0.95),
-                lesionType: "Nevo Melanocítico",
-                riskLevel: .low,
-                recommendations: [
-                    "Acompanhamento dermatológico anual",
-                    "Proteção solar adequada",
-                    "Monitoramento de mudanças na lesão"
-                ]
-            )
-            photo.analysisResult = mockResult
-        }
-        
-        try? photoRepository.update(photo)
-    }
 }
