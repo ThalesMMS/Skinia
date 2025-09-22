@@ -7,7 +7,12 @@ final class PhotoMetadata {
     var id: UUID
     var deviceInfo: String
     var imageQuality: ImageQuality
-    var bodyLocation: String?
+    var bodyLocation: String? {
+        didSet {
+            refreshSearchableBodyLocation()
+        }
+    }
+    var searchableBodyLocation: String?
     var imageWidth: Double
     var imageHeight: Double
     var fileSize: Int64 // Em bytes
@@ -33,6 +38,7 @@ final class PhotoMetadata {
         self.deviceInfo = deviceInfo
         self.imageQuality = imageQuality
         self.bodyLocation = bodyLocation
+        self.searchableBodyLocation = PhotoMetadata.normalizedBodyLocation(from: bodyLocation)
         self.imageWidth = Double(imageSize.width)
         self.imageHeight = Double(imageSize.height)
         self.fileSize = fileSize
@@ -44,6 +50,39 @@ final class PhotoMetadata {
 }
 
 extension PhotoMetadata {
+    func refreshSearchableBodyLocation() {
+        searchableBodyLocation = PhotoMetadata.normalizedBodyLocation(from: bodyLocation)
+    }
+
+    static func populateMissingSearchableBodyLocations(in context: ModelContext) throws {
+        let predicate = #Predicate<PhotoMetadata> { metadata in
+            metadata.bodyLocation != nil && metadata.searchableBodyLocation == nil
+        }
+        let descriptor = FetchDescriptor<PhotoMetadata>(predicate: predicate)
+
+        let metadataToUpdate = try context.fetch(descriptor)
+        guard !metadataToUpdate.isEmpty else { return }
+
+        metadataToUpdate.forEach { $0.refreshSearchableBodyLocation() }
+        try context.save()
+    }
+
+    private static func normalizedBodyLocation(from value: String?) -> String? {
+        guard let value,
+              !value.isEmpty else {
+            return nil
+        }
+
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return nil
+        }
+
+        return trimmed
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+    }
+
     var imageSize: CGSize {
         get {
             return CGSize(width: imageWidth, height: imageHeight)

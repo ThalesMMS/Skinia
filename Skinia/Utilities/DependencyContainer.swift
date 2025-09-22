@@ -60,8 +60,18 @@ final class DependencyContainer: DependencyContainerProtocol {
     
     // MARK: - Singleton
     static let shared = DependencyContainer()
-    
-    private init() {}
+
+    private init() {
+        migrateSearchableBodyLocationsIfNeeded()
+    }
+
+    func migrateSearchableBodyLocationsIfNeeded() {
+        do {
+            try PhotoMetadata.populateMissingSearchableBodyLocations(in: modelContainer.mainContext)
+        } catch {
+            print("Failed to migrate searchable body locations: \(error)")
+        }
+    }
 }
 
 // MARK: - Protocol Placeholders

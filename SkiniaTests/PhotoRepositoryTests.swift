@@ -233,32 +233,57 @@ struct PhotoRepositoryTests {
     @Test func searchPhotosByBodyLocation() async throws {
         let container = createInMemoryContainer()
         let repository = PhotoRepository(modelContainer: container)
-        
+
         // Create photos with metadata containing body locations
         let armPhoto = createTestPhoto()
         let armMetadata = PhotoMetadata(bodyLocation: "Braço direito")
         armPhoto.metadata = armMetadata
-        
+
         let legPhoto = createTestPhoto()
         let legMetadata = PhotoMetadata(bodyLocation: "Perna esquerda")
         legPhoto.metadata = legMetadata
-        
+
         let facePhoto = createTestPhoto()
         let faceMetadata = PhotoMetadata(bodyLocation: "Rosto")
         facePhoto.metadata = faceMetadata
-        
+
         try repository.save(armPhoto)
         try repository.save(legPhoto)
         try repository.save(facePhoto)
-        
-        // Search for photos containing "braço"
-        let armPhotos = try repository.searchPhotos(bodyLocation: "braço")
+
+        // Search ignoring diacritics and case
+        let armPhotos = try repository.searchPhotos(bodyLocation: "BRACO")
         #expect(armPhotos.count == 1)
         #expect(armPhotos[0].metadata?.bodyLocation?.contains("Braço") == true)
-        
+
         // Search for photos containing "perna"
         let legPhotos = try repository.searchPhotos(bodyLocation: "perna")
         #expect(legPhotos.count == 1)
+
+        // Ensure blank search returns nothing
+        let emptySearch = try repository.searchPhotos(bodyLocation: "   ")
+        #expect(emptySearch.isEmpty)
+    }
+
+    @Test func searchPhotosUpdatesLegacyMetadata() async throws {
+        let container = createInMemoryContainer()
+        let repository = PhotoRepository(modelContainer: container)
+
+        let legacyPhoto = createTestPhoto()
+        let legacyMetadata = PhotoMetadata(bodyLocation: "Braço direito")
+        legacyPhoto.metadata = legacyMetadata
+
+        try repository.save(legacyPhoto)
+
+        // Simulate legacy data without searchable value
+        legacyMetadata.searchableBodyLocation = nil
+        try container.mainContext.save()
+
+        // Migration should restore searchable field
+        try PhotoMetadata.populateMissingSearchableBodyLocations(in: container.mainContext)
+
+        let migratedSearch = try repository.searchPhotos(bodyLocation: "braco")
+        #expect(migratedSearch.count == 1)
     }
     
     @Test func deleteAllPhotos() async throws {

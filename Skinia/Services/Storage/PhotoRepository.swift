@@ -111,34 +111,37 @@ extension PhotoRepository {
     }
     
     func fetchPhotosNeedingAttention() throws -> [SkinLesionPhoto] {
-        // Simplificando para buscar todas e filtrar em memória por enquanto
         let predicate = #Predicate<SkinLesionPhoto> { photo in
-            !photo.isDeleted
+            !photo.isDeleted && (
+                photo.analysisStatus == .failed ||
+                (photo.analysisStatus == .completed && photo.analysisResult?.riskLevel == .urgent)
+            )
         }
         let descriptor = FetchDescriptor<SkinLesionPhoto>(
             predicate: predicate,
             sortBy: [SortDescriptor(\.captureDate, order: .reverse)]
         )
-        let allPhotos = try modelContext.fetch(descriptor)
-        
-        return allPhotos.filter { photo in
-            photo.analysisStatus == .failed || 
-            (photo.analysisStatus == .completed && photo.analysisResult?.riskLevel == .urgent)
-        }
+        return try modelContext.fetch(descriptor)
     }
-    
+
     func searchPhotos(bodyLocation: String) throws -> [SkinLesionPhoto] {
-        // Por enquanto, vamos buscar todas as fotos e filtrar em memória devido às limitações do Predicate
+        let trimmedSearch = bodyLocation.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedSearch.isEmpty else {
+            return []
+        }
+
+        let normalizedSearch = trimmedSearch
+            .folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .current)
+            .lowercased()
+
         let predicate = #Predicate<SkinLesionPhoto> { photo in
-            !photo.isDeleted
+            !photo.isDeleted &&
+            photo.metadata?.searchableBodyLocation?.contains(normalizedSearch) == true
         }
         let descriptor = FetchDescriptor<SkinLesionPhoto>(
             predicate: predicate,
             sortBy: [SortDescriptor(\.captureDate, order: .reverse)]
         )
-        let allPhotos = try modelContext.fetch(descriptor)
-        return allPhotos.filter { photo in
-            photo.metadata?.bodyLocation?.localizedStandardContains(bodyLocation) == true
-        }
+        return try modelContext.fetch(descriptor)
     }
 }
