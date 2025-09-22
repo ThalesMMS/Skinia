@@ -141,15 +141,35 @@ final class AnalysisService: AnalysisServiceProtocol {
         // Cancel the task
         analysisTasks[photoId]?.cancel()
         analysisTasks.removeValue(forKey: photoId)
-        
+
         // Remove progress tracker
         activeAnalyses.removeValue(forKey: photoId)
-        
-        // Update photo status
-        if let photos = try? photoRepository.fetchAll(),
-           let photo = photos.first(where: { $0.id == photoId }) {
+
+        // Attempt to restore photo status
+        do {
+            guard let photo = try photoRepository.fetch(with: photoId) else {
+                return
+            }
+
             photo.analysisStatus = .pending
-            try? photoRepository.update(photo)
+
+            do {
+                try photoRepository.update(photo)
+            } catch {
+                print("AnalysisService.cancelAnalysis - failed to update photo: \(error)")
+                notificationManager.show(
+                    title: "Erro ao atualizar análise",
+                    message: "Não foi possível restaurar o status da foto cancelada.",
+                    type: .error
+                )
+            }
+        } catch {
+            print("AnalysisService.cancelAnalysis - failed to fetch photo: \(error)")
+            notificationManager.show(
+                title: "Erro ao carregar foto",
+                message: "Não foi possível acessar a foto para cancelar a análise.",
+                type: .error
+            )
         }
     }
     
