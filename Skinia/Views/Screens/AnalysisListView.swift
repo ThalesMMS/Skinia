@@ -29,6 +29,7 @@ struct AnalysisListView: View {
     @State private var showingHistoryOptions = false
     @State private var showingBatchActions = false
     @State private var selectedPhotos = Set<UUID>()
+    @State private var isSelectionMode = false
     @StateObject private var sheetState = SheetState()
     @State private var activeAlert: AlertContext?
 
@@ -66,20 +67,20 @@ struct AnalysisListView: View {
             .navigationTitle("Análises")
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarLeading) {
-                    if !selectedPhotos.isEmpty {
+                    if isSelectionMode {
                         Button("Cancelar") {
-                            selectedPhotos.removeAll()
+                            clearSelection()
                         }
                     }
                 }
-                
+
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    if !selectedPhotos.isEmpty {
+                    if isSelectionMode {
                         Menu {
                             Button("Exportar Selecionadas") {
                                 exportSelectedPhotos()
                             }
-                            
+
                             Button("Excluir Selecionadas", role: .destructive) {
                                 deleteSelectedPhotos()
                             }
@@ -107,9 +108,14 @@ struct AnalysisListView: View {
                             Button("Exportar Todas") {
                                 exportAllPhotos()
                             }
-                            
+
                             Button("Selecionar") {
-                                // Enable selection mode
+                                if isSelectionMode {
+                                    clearSelection()
+                                } else {
+                                    isSelectionMode = true
+                                    selectedPhotos.removeAll()
+                                }
                             }
                         } label: {
                             Image(systemName: "ellipsis.circle")
@@ -216,7 +222,7 @@ struct AnalysisListView: View {
                 Section {
                     ForEach(viewModel.photosNeedingAttention, id: \.id) { photo in
                         HStack {
-                            if !selectedPhotos.isEmpty {
+                            if isSelectionMode {
                                 Button(action: {
                                     toggleSelection(for: photo.id)
                                 }) {
@@ -227,7 +233,7 @@ struct AnalysisListView: View {
                             }
                             
                             AnalysisListCell(photo: photo) {
-                                if selectedPhotos.isEmpty {
+                                if !isSelectionMode {
                                     print("🔍 Card tapped - showing detail for photo: \(photo.id)")
                                     sheetState.showSheet(with: photo)
                                 } else {
@@ -251,7 +257,7 @@ struct AnalysisListView: View {
             Section {
                 ForEach(viewModel.photos, id: \.id) { photo in
                     HStack {
-                        if !selectedPhotos.isEmpty {
+                        if isSelectionMode {
                             Button(action: {
                                 toggleSelection(for: photo.id)
                             }) {
@@ -262,7 +268,7 @@ struct AnalysisListView: View {
                         }
                         
                         AnalysisListCell(photo: photo) {
-                            if selectedPhotos.isEmpty {
+                            if !isSelectionMode {
                                 print("🔍 Card tapped - showing detail for photo: \(photo.id)")
                                 sheetState.showSheet(with: photo)
                             } else {
@@ -306,12 +312,15 @@ struct AnalysisListView: View {
             selectedPhotos.insert(photoId)
         }
     }
-    
+
     private func exportSelectedPhotos() {
         let photosToExport = viewModel.getAllPhotos.filter { selectedPhotos.contains($0.id) }
-        if performExport(photos: photosToExport, format: .pdf, emptyMessage: "Selecione ao menos uma foto para exportar.") {
-            selectedPhotos.removeAll()
-        }
+        _ = performExport(
+            photos: photosToExport,
+            format: .pdf,
+            emptyMessage: "Selecione ao menos uma foto para exportar."
+        )
+        clearSelection()
     }
 
     private func exportAllPhotos() {
@@ -323,7 +332,12 @@ struct AnalysisListView: View {
         for photo in photosToDelete {
             viewModel.deletePhoto(photo)
         }
+        clearSelection()
+    }
+
+    private func clearSelection() {
         selectedPhotos.removeAll()
+        isSelectionMode = false
     }
 
     @discardableResult
