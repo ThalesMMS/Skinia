@@ -627,18 +627,24 @@ struct AnalysisDetailView: View {
     // MARK: - Action Functions
     
     private func retryAnalysis() {
-        isRetryingAnalysis = true
         Task {
+            await MainActor.run {
+                isRetryingAnalysis = true
+            }
             do {
                 try await analysisService.retryAnalysis(for: photo)
             } catch {
-                notificationManager.show(
-                    title: "Erro ao Repetir Análise",
-                    message: error.localizedDescription,
-                    type: .error
-                )
+                await MainActor.run {
+                    notificationManager.show(
+                        title: "Erro ao Repetir Análise",
+                        message: error.localizedDescription,
+                        type: .error
+                    )
+                }
             }
-            isRetryingAnalysis = false
+            await MainActor.run {
+                isRetryingAnalysis = false
+            }
         }
     }
     
