@@ -8,6 +8,8 @@ protocol DependencyContainerProtocol {
     var analysisService: any AnalysisServiceProtocol { get }
     var cameraService: any CameraServiceProtocol { get }
     var networkService: any NetworkServiceProtocol { get }
+    var analysisExportService: any AnalysisExportServiceProtocol { get }
+    var shareSheetPresenter: ShareSheetPresenter { get }
     
     // Storage
     var modelContainer: ModelContainer { get }
@@ -18,6 +20,7 @@ final class DependencyContainer: DependencyContainerProtocol {
     
     // MARK: - Managers
     let notificationManager = NotificationManager()
+    let shareSheetPresenter = ShareSheetPresenter()
     
     // MARK: - Storage
     lazy var modelContainer: ModelContainer = {
@@ -57,6 +60,8 @@ final class DependencyContainer: DependencyContainerProtocol {
     )
 
     lazy var networkService: any NetworkServiceProtocol = RemoteAnalysisNetworkService()
+
+    lazy var analysisExportService: any AnalysisExportServiceProtocol = AnalysisExportService()
     
     // MARK: - Singleton
     static let shared = DependencyContainer()
