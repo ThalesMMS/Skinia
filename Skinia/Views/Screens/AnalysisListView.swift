@@ -158,7 +158,11 @@ struct AnalysisListView: View {
             if let photoToShow = sheetState.selectedPhoto {
                 let _ = print("🔍 Sheet presenting AnalysisDetailView for photo: \(photoToShow.id)")
                 NavigationView {
-                    AnalysisDetailView(photo: photoToShow)
+                    AnalysisDetailView(
+                        photo: photoToShow,
+                        photoRepository: coordinator.dependencyContainer.photoRepository,
+                        analysisService: coordinator.dependencyContainer.analysisService
+                    )
                         .navigationBarTitleDisplayMode(.inline)
                         .toolbar {
                             ToolbarItem(placement: .navigationBarLeading) {
