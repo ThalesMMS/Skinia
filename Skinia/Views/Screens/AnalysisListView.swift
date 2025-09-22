@@ -39,7 +39,10 @@ struct AnalysisListView: View {
                             try PreviewPhotoFactory.seed(repository: coordinator.dependencyContainer.photoRepository)
                             viewModel.loadPhotos()
                         } catch {
-                            print("Falha ao carregar dados de exemplo: \(error)")
+                            activeAlert = AnalysisListAlertContext(
+                                title: "Erro",
+                                message: "Falha ao carregar dados de exemplo: \(error.localizedDescription)"
+                            )
                         }
                     }
                 } else {
@@ -48,62 +51,18 @@ struct AnalysisListView: View {
             }
             .navigationTitle("Análises")
             .toolbar {
-                ToolbarItemGroup(placement: .navigationBarLeading) {
-                    if selectionHelper.isSelectionMode {
-                        Button("Cancelar") {
-                            selectionHelper.clearSelection()
-                        }
-                    }
-                }
-
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    if selectionHelper.isSelectionMode {
-                        Menu {
-                            Button("Exportar Selecionadas") {
-                                exportSelectedPhotos()
-                            }
-
-                            Button("Excluir Selecionadas", role: .destructive) {
-                                HapticManager.shared.selection()
-                                showingDeleteConfirmation = true
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                        }
-                    } else {
-                        Button {
-                            showingSearchField.toggle()
-                        } label: {
-                            Image(systemName: "magnifyingglass")
-                        }
-
-                        Button {
-                            showingFilterSheet = true
-                        } label: {
-                            Image(systemName: viewModel.selectedStatusFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                        }
-
-                        Menu {
-                            Button("Estatísticas") {
-                                showingHistoryOptions = true
-                            }
-
-                            Button("Exportar Todas") {
-                                activeAlert = exportAllPhotos()
-                            }
-
-                            Button("Selecionar") {
-                                if selectionHelper.isSelectionMode {
-                                    selectionHelper.clearSelection()
-                                } else {
-                                    selectionHelper.enableSelectionMode()
-                                }
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                        }
-                    }
-                }
+                AnalysisListToolbarContent(
+                    selectionHelper: selectionHelper,
+                    showingSearchField: $showingSearchField,
+                    showingFilterSheet: $showingFilterSheet,
+                    showingHistoryOptions: $showingHistoryOptions,
+                    showingDeleteConfirmation: $showingDeleteConfirmation,
+                    activeAlert: $activeAlert,
+                    isFilterActive: viewModel.selectedStatusFilter != nil,
+                    onExportSelected: handleExportSelected,
+                    onExportAll: handleExportAll(format:),
+                    onDeleteSelected: handleDeleteSelected
+                )
             }
             .refreshable {
                 HapticManager.shared.impact(.light)
@@ -122,7 +81,7 @@ struct AnalysisListView: View {
                     viewModel: viewModel,
                     activeAlert: $activeAlert,
                     onExport: { format in
-                        exportAllPhotos(format: format)
+                        handleExportAll(format: format)
                     },
                     onShareStatistics: {
                         shareStatisticsSummary()
@@ -138,22 +97,6 @@ struct AnalysisListView: View {
                         viewModel.clearErrorMessage()
                     }
                 )
-            }
-            .confirmationDialog(
-                "Confirmar exclusão",
-                isPresented: $showingDeleteConfirmation,
-                titleVisibility: .visible
-            ) {
-                Button("Excluir", role: .destructive) {
-                    HapticManager.shared.impact(.medium)
-                    deleteSelectedPhotos()
-                }
-
-                Button("Cancelar", role: .cancel) {
-                    HapticManager.shared.selection()
-                }
-            } message: {
-                Text("Esta ação é irreversível. As análises selecionadas serão removidas permanentemente.")
             }
         }
         .onAppear {
@@ -180,45 +123,12 @@ struct AnalysisListView: View {
             }
         }
         .sheet(isPresented: $sheetState.isShowing) {
-            let _ = print("🔍 Sheet building - isShowing: \(sheetState.isShowing), selectedPhoto: \(sheetState.selectedPhoto?.id.uuidString ?? "nil")")
-
-            if let photoToShow = sheetState.selectedPhoto {
-                let _ = print("🔍 Sheet presenting AnalysisDetailView for photo: \(photoToShow.id)")
-                NavigationView {
-                    AnalysisDetailView(
-                        photo: photoToShow,
-                        photoRepository: coordinator.dependencyContainer.photoRepository,
-                        analysisService: coordinator.dependencyContainer.analysisService,
-                        analysisExportService: exportService,
-                        shareSheetPresenter: shareSheetPresenter
-                    )
-                        .navigationBarTitleDisplayMode(.inline)
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarLeading) {
-                                Button("Fechar") {
-                                    print("🔍 Closing sheet")
-                                    sheetState.hideSheet()
-                                }
-                            }
-                        }
-                        .onAppear {
-                            print("🔍 Sheet AnalysisDetailView appeared for photo: \(photoToShow.id)")
-                        }
-                }
-                .navigationViewStyle(StackNavigationViewStyle())
-                .environment(\.analysisService, coordinator.dependencyContainer.analysisService)
-                .environment(\.notificationManager, coordinator.dependencyContainer.notificationManager)
-            } else {
-                let _ = print("🔍 Sheet presenting but selectedPhoto is nil - creating placeholder")
-                VStack {
-                    Text("Error: Photo not found")
-                        .foregroundColor(.red)
-                    Button("Close") {
-                        sheetState.hideSheet()
-                    }
-                }
-                .padding()
-            }
+            AnalysisDetailSheetView(
+                sheetState: sheetState,
+                dependencyContainer: coordinator.dependencyContainer,
+                exportService: exportService,
+                shareSheetPresenter: shareSheetPresenter
+            )
         }
     }
 
@@ -287,22 +197,21 @@ struct AnalysisListView: View {
                 if selectionHelper.isSelectionMode {
                     selectionHelper.toggleSelection(for: photo.id)
                 } else {
-                    print("🔍 Card tapped - showing detail for photo: \(photo.id)")
                     sheetState.showSheet(with: photo)
                 }
             }
         }
     }
 
-    private func exportSelectedPhotos() {
-        activeAlert = selectionHelper.exportSelectedPhotos(
+    private func handleExportSelected() -> AnalysisListAlertContext? {
+        selectionHelper.exportSelectedPhotos(
             using: viewModel,
             exportService: exportService,
             shareSheetPresenter: shareSheetPresenter
         )
     }
 
-    private func exportAllPhotos(
+    private func handleExportAll(
         format: AnalysisExportFormat = .pdf,
         emptyMessage: String = "Nenhuma foto disponível para exportação."
     ) -> AnalysisListAlertContext? {
@@ -315,34 +224,17 @@ struct AnalysisListView: View {
         )
     }
 
-    private func deleteSelectedPhotos() {
+    private func handleDeleteSelected() {
         selectionHelper.deleteSelectedPhotos(using: viewModel)
     }
 
     private func shareStatisticsSummary() -> AnalysisListAlertContext? {
-        let photos = viewModel.getAllPhotos
-
-        guard !photos.isEmpty else {
+        guard let summary = AnalysisListStatisticsFormatter.statisticsSummary(from: viewModel.getAllPhotos) else {
             return AnalysisListAlertContext(
                 title: "Sem dados",
                 message: "Cadastre análises para compartilhar estatísticas."
             )
         }
-
-        let total = photos.count
-        let completed = photos.filter { $0.analysisStatus == .completed }.count
-        let pending = photos.filter { $0.isPendingAnalysis }.count
-        let failed = photos.filter { $0.hasError }.count
-        let highRisk = photos.filter { $0.analysisResult?.riskLevel == .high || $0.analysisResult?.riskLevel == .urgent }.count
-
-        let summary = """
-        Estatísticas de Análises
-        Total de fotos: \(total)
-        Concluídas: \(completed)
-        Em andamento: \(pending)
-        Com erro: \(failed)
-        Alto ou urgente risco: \(highRisk)
-        """
 
         shareSheetPresenter.present(items: [summary])
         return nil
