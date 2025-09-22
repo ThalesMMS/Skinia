@@ -931,12 +931,7 @@ struct ShareSheet: UIViewControllerRepresentable {
 }
 
 #Preview {
-    let mockPhoto = SkinLesionPhoto(
-        imageData: Data(),
-        analysisStatus: .completed
-    )
-    
     NavigationView {
-        AnalysisDetailView(photo: mockPhoto)
+        AnalysisDetailView(photo: PreviewPhotoFactory.makeSamplePhoto(.completedUrgent))
     }
 }
