@@ -193,12 +193,24 @@ struct ModelTests {
             imageSize: CGSize(width: 1920, height: 1080),
             fileSize: 2048000 // 2MB
         )
-        
+
         #expect(metadata.deviceInfo == "iPhone 15 Pro")
         #expect(metadata.imageQuality == .excellent)
         #expect(metadata.bodyLocation == "Braço direito")
+        #expect(metadata.searchableBodyLocation == "braco direito")
         #expect(metadata.imageSize.width == 1920)
         #expect(metadata.fileSize == 2048000)
+    }
+
+    @Test func photoMetadataUpdatesSearchableBodyLocation() {
+        let metadata = PhotoMetadata(bodyLocation: "Braço direito")
+        #expect(metadata.searchableBodyLocation == "braco direito")
+
+        metadata.bodyLocation = "Perna Esquerda"
+        #expect(metadata.searchableBodyLocation == "perna esquerda")
+
+        metadata.bodyLocation = nil
+        #expect(metadata.searchableBodyLocation == nil)
     }
     
     @Test func photoMetadataFormatting() {
