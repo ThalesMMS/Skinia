@@ -5,6 +5,7 @@ import SwiftData
 protocol DependencyContainerProtocol {
     // Services
     var photoRepository: any PhotoRepositoryProtocol { get }
+    var examRepository: any ExamRepositoryProtocol { get }
     var analysisService: any AnalysisServiceProtocol { get }
     var cameraService: any CameraServiceProtocol { get }
     var networkService: any NetworkServiceProtocol { get }
@@ -49,6 +50,10 @@ final class DependencyContainer: DependencyContainerProtocol {
         modelContainer: modelContainer
     )
 
+    lazy var examRepository: any ExamRepositoryProtocol = ExamRepository(
+        modelContainer: modelContainer
+    )
+
     lazy var analysisService: any AnalysisServiceProtocol = AnalysisService(
         networkService: networkService,
         photoRepository: photoRepository,
@@ -58,7 +63,8 @@ final class DependencyContainer: DependencyContainerProtocol {
     lazy var cameraService: any CameraServiceProtocol = CameraService(
         photoRepository: photoRepository,
         analysisService: analysisService,
-        notificationManager: notificationManager
+        notificationManager: notificationManager,
+        examRepository: examRepository
     )
 
     lazy var networkService: any NetworkServiceProtocol = RemoteAnalysisNetworkService()

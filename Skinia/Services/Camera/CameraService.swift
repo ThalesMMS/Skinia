@@ -5,11 +5,18 @@ final class CameraService: CameraServiceProtocol {
     private let photoRepository: any PhotoRepositoryProtocol
     private let analysisService: any AnalysisServiceProtocol
     private let notificationManager: NotificationManager
+    private let examRepository: any ExamRepositoryProtocol
 
-    init(photoRepository: any PhotoRepositoryProtocol, analysisService: any AnalysisServiceProtocol, notificationManager: NotificationManager) {
+    init(
+        photoRepository: any PhotoRepositoryProtocol,
+        analysisService: any AnalysisServiceProtocol,
+        notificationManager: NotificationManager,
+        examRepository: any ExamRepositoryProtocol
+    ) {
         self.photoRepository = photoRepository
         self.analysisService = analysisService
         self.notificationManager = notificationManager
+        self.examRepository = examRepository
     }
 
     func savePhoto(_ imageData: Data, bodyLocation: String?, userNotes: String?, patientName: String?, patientID: String?, metadata: PhotoMetadata) async throws -> SkinLesionPhoto {
@@ -28,6 +35,7 @@ final class CameraService: CameraServiceProtocol {
         exam.addPhoto(photo)
 
         try photoRepository.save(photo)
+        try examRepository.update(exam)
 
         Task { @MainActor in
             do {
@@ -51,6 +59,20 @@ final class CameraService: CameraServiceProtocol {
     }
 
     private func findOrCreateExam(patientName: String?, patientID: String?) async throws -> Exam {
-        return Exam(patientName: patientName, patientID: patientID)
+        let trimmedID = patientID?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedName = patientName?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        if let existingExam = try examRepository.fetch(patientID: trimmedID, patientName: trimmedName) {
+            if existingExam.patientID != trimmedID || existingExam.patientName != trimmedName {
+                existingExam.updatePatientInfo(name: trimmedName, id: trimmedID)
+                try examRepository.update(existingExam)
+            }
+
+            return existingExam
+        }
+
+        let newExam = Exam(patientName: trimmedName, patientID: trimmedID)
+        try examRepository.save(newExam)
+        return newExam
     }
 }
