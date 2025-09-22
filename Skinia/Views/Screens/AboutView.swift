@@ -351,6 +351,12 @@ struct AcknowledgmentItem: View {
 // MARK: - Legal Links Card
 
 struct LegalLinksCard: View {
+    private let legalDocumentOpener: LegalDocumentOpening
+
+    init(legalDocumentOpener: LegalDocumentOpening = LegalDocumentOpener.shared) {
+        self.legalDocumentOpener = legalDocumentOpener
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: DesignSystem.Spacing.md) {
             HStack(spacing: DesignSystem.Spacing.sm) {
@@ -362,21 +368,21 @@ struct LegalLinksCard: View {
                     .font(DesignSystem.Typography.headline)
                     .foregroundColor(DesignSystem.Colors.text)
             }
-            
+
             VStack(spacing: DesignSystem.Spacing.sm) {
                 LegalLinkItem(title: "Termos de Uso", action: {
-                    // TODO: Implementar abertura dos termos
+                    legalDocumentOpener.open(.termsOfUse)
                 })
-                
+
                 LegalLinkItem(title: "Política de Privacidade", action: {
-                    // TODO: Implementar abertura da política
+                    legalDocumentOpener.open(.privacyPolicy)
                 })
-                
+
                 LegalLinkItem(title: "Licenças de Terceiros", action: {
-                    // TODO: Implementar abertura das licenças
+                    legalDocumentOpener.open(.thirdPartyLicenses)
                 })
             }
-            
+
             Text("Este app não armazena dados pessoais em servidores externos e respeita completamente sua privacidade.")
                 .font(DesignSystem.Typography.caption)
                 .foregroundColor(DesignSystem.Colors.textTertiary)
@@ -414,3 +420,30 @@ struct LegalLinkItem: View {
 #Preview {
     AboutView()
 }
+
+#if DEBUG
+private struct LegalLinksCardPreviewContainer: View {
+    @StateObject private var legalOpener = PreviewLegalDocumentOpener()
+
+    var body: some View {
+        LegalLinksCard(legalDocumentOpener: legalOpener)
+            .padding()
+            .background(DesignSystem.Colors.surface)
+            .previewLayout(.sizeThatFits)
+            .overlay(alignment: .bottom) {
+                if let document = legalOpener.lastOpenedDocument {
+                    PreviewLegalDocumentBanner(title: document.localizedTitle)
+                        .padding(.bottom)
+                }
+            }
+            .overlay(alignment: .top) {
+                PreviewInstructionLabel(text: "Toque em qualquer link para verificar a ação simulada.")
+            }
+            .animation(.easeInOut, value: legalOpener.lastOpenedDocument)
+    }
+}
+
+#Preview("Card de Links Legais") {
+    LegalLinksCardPreviewContainer()
+}
+#endif
