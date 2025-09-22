@@ -55,9 +55,19 @@ final class CameraPermissionManager: ObservableObject {
 }
 
 struct CameraPermissionView: View {
-    @StateObject private var permissionManager = CameraPermissionManager()
+    @ObservedObject private var permissionManager: CameraPermissionManager
     let onPermissionGranted: () -> Void
     let onPermissionDenied: () -> Void
+
+    init(
+        permissionManager: CameraPermissionManager = CameraPermissionManager(),
+        onPermissionGranted: @escaping () -> Void,
+        onPermissionDenied: @escaping () -> Void
+    ) {
+        self._permissionManager = ObservedObject(wrappedValue: permissionManager)
+        self.onPermissionGranted = onPermissionGranted
+        self.onPermissionDenied = onPermissionDenied
+    }
     
     var body: some View {
         VStack(spacing: 30) {
