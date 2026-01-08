@@ -1,0 +1,274 @@
+import SwiftUI
+
+struct AnalysisDetailView: View {
+    @State private var viewModel: AnalysisDetailViewModel
+    @StateObject private var coordinator: AnalysisListCoordinator
+    
+    @State private var showingDeleteAlert = false
+    
+    init(photo: SkinLesionPhoto, coordinator: AnalysisListCoordinator) {
+        self._coordinator = StateObject(wrappedValue: coordinator)
+        self._viewModel = State(wrappedValue: AnalysisDetailViewModel(
+            photo: photo,
+            photoRepository: coordinator.dependencyContainer.photoRepository
+        ))
+    }
+    
+    var body: some View {
+        ScrollView {
+            VStack(spacing: 24) {
+                photoSection
+                statusSection
+                
+                if let result = viewModel.photo.analysisResult {
+                    analysisResultSection(result)
+                }
+                
+                if let metadata = viewModel.photo.metadata {
+                    metadataSection(metadata)
+                }
+                
+                actionButtons
+            }
+            .padding()
+        }
+        .navigationTitle("Detalhes da Análise")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                Button("Excluir", role: .destructive) {
+                    showingDeleteAlert = true
+                }
+            }
+        }
+        .alert("Excluir Foto", isPresented: $showingDeleteAlert) {
+            Button("Cancelar", role: .cancel) { }
+            Button("Excluir", role: .destructive) {
+                Task {
+                    do {
+                        try await viewModel.deletePhoto()
+                        coordinator.pop()
+                    } catch {
+                        // Handle error
+                    }
+                }
+            }
+        } message: {
+            Text("Esta ação não pode ser desfeita.")
+        }
+        .alert("Erro", isPresented: .constant(viewModel.errorMessage != nil)) {
+            Button("OK") {
+                // Clear error
+            }
+        } message: {
+            if let error = viewModel.errorMessage {
+                Text(error)
+            }
+        }
+    }
+    
+    private var photoSection: some View {
+        VStack(spacing: 12) {
+            if let image = viewModel.photo.fullImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay {
+                        Image(systemName: "photo")
+                            .font(.system(size: 40))
+                            .foregroundColor(.gray)
+                    }
+            .frame(height: 300)
+            .clipped()
+            .cornerRadius(12)
+        }
+    }
+    
+    private var statusSection: some View {
+        VStack(spacing: 16) {
+            HStack {
+                StatusBadge(status: viewModel.photo.analysisStatus)
+                Spacer()
+                Text(viewModel.photo.formattedCaptureDate)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Status")
+                        .font(.headline)
+                    Spacer()
+                }
+                
+                Text(viewModel.statusDescription)
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                
+                if viewModel.photo.analysisStatus != .completed && viewModel.photo.analysisStatus != .failed {
+                    ProgressView(value: viewModel.progressPercentage)
+                        .progressViewStyle(LinearProgressViewStyle())
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+    
+    private func analysisResultSection(_ result: AnalysisResult) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Text("Resultado da Análise")
+                    .font(.headline)
+                Spacer()
+                RiskBadge(riskLevel: result.riskLevel)
+            }
+            
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Confiança")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    Spacer()
+                    Text("\(Int(result.confidence * 100))%")
+                        .font(.subheadline)
+                        .fontWeight(.semibold)
+                }
+                
+                ProgressView(value: result.confidence)
+                    .progressViewStyle(LinearProgressViewStyle())
+            }
+            
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Tipo de Lesão")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                
+                HStack(alignment: .top, spacing: 8) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundColor(.green)
+                        .font(.caption)
+                    Text(result.lesionType)
+                        .font(.caption)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Spacer()
+                }
+            }
+            
+            if !result.recommendations.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Recomendações")
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                    
+                    ForEach(result.recommendations, id: \.self) { recommendation in
+                        HStack(alignment: .top, spacing: 8) {
+                            Image(systemName: "lightbulb.fill")
+                                .foregroundColor(.orange)
+                                .font(.caption)
+                            Text(recommendation)
+                                .font(.caption)
+                                .fixedSize(horizontal: false, vertical: true)
+                            Spacer()
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color(.systemGray4), lineWidth: 1)
+        )
+        .cornerRadius(12)
+    }
+    
+    private func metadataSection(_ metadata: PhotoMetadata) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Informações Técnicas")
+                .font(.headline)
+            
+            VStack(spacing: 8) {
+                metadataRow(label: "Qualidade", value: metadata.imageQuality.rawValue.capitalized)
+                metadataRow(label: "Dispositivo", value: metadata.deviceInfo)
+                metadataRow(label: "Orientação", value: metadata.orientation.capitalized)
+                metadataRow(label: "Dimensões", value: metadata.imageDimensions)
+                metadataRow(label: "Tamanho", value: metadata.fileSizeFormatted)
+                
+                if let bodyLocation = metadata.bodyLocation {
+                    metadataRow(label: "Local do Corpo", value: bodyLocation)
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .cornerRadius(12)
+    }
+    
+    private func metadataRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+            Spacer()
+            Text(value)
+                .font(.caption)
+                .fontWeight(.medium)
+        }
+    }
+    
+    private var actionButtons: some View {
+        VStack(spacing: 12) {
+            if viewModel.canRetryAnalysis {
+                Button {
+                    Task {
+                        await viewModel.retryAnalysis()
+                    }
+                } label: {
+                    HStack {
+                        if viewModel.isRetrying {
+                            ProgressView()
+                                .scaleEffect(0.8)
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                        Text(viewModel.isRetrying ? "Reprocessando..." : "Tentar Novamente")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(viewModel.isRetrying)
+            }
+            
+            if viewModel.photo.analysisStatus == .completed {
+                Button("Compartilhar Resultado") {
+                    // TODO: Implement sharing functionality
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .buttonStyle(.bordered)
+            }
+        }
+    }
+}
+
+#Preview {
+    let container = DependencyContainer.shared
+    let coordinator = AnalysisListCoordinator(dependencyContainer: container)
+    
+    // Create a mock photo for preview
+    let mockPhoto = SkinLesionPhoto(
+        imageData: Data(),
+        analysisStatus: .completed
+    )
+    
+    NavigationView {
+        AnalysisDetailView(photo: mockPhoto, coordinator: coordinator)
+    }
+}
