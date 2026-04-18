@@ -18,13 +18,13 @@ struct SettingsView: View {
     var body: some View {
         NavigationView {
             List {
-                // MARK: - Análise e Qualidade
-                Section("Análise e Qualidade") {
+                // MARK: - Analysis & Quality
+                Section("Analysis & Quality") {
                     SettingsRow(
                         icon: "photo.badge.checkmark",
                         iconColor: DesignSystem.Colors.primary,
-                        title: "Qualidade da Imagem",
-                        subtitle: "Configurar resolução e compressão",
+                        title: "Image Quality",
+                        subtitle: "Configure resolution and compression",
                         action: {
                             showingImageQualitySettings = true
                         }
@@ -33,21 +33,21 @@ struct SettingsView: View {
                     SettingsRow(
                         icon: "bell.badge",
                         iconColor: DesignSystem.Colors.secondary,
-                        title: "Notificações",
-                        subtitle: "Resultados de análise e lembretes",
+                        title: "Notifications",
+                        subtitle: "Analysis results and reminders",
                         action: {
                             showingNotificationSettings = true
                         }
                     )
                 }
                 
-                // MARK: - Privacidade e Segurança
-                Section("Privacidade e Segurança") {
+                // MARK: - Privacy & Security
+                Section("Privacy & Security") {
                     SettingsRow(
                         icon: "lock.shield",
                         iconColor: DesignSystem.Colors.success,
-                        title: "Privacidade",
-                        subtitle: "Gerenciar dados e permissões",
+                        title: "Privacy",
+                        subtitle: "Manage data and permissions",
                         action: {
                             showingPrivacySheet = true
                         }
@@ -56,21 +56,21 @@ struct SettingsView: View {
                     SettingsRow(
                         icon: "camera",
                         iconColor: DesignSystem.Colors.info,
-                        title: "Permissões da Câmera",
-                        subtitle: "Configurar acesso à câmera e fotos",
+                        title: "Camera Permissions",
+                        subtitle: "Configure camera and photo access",
                         action: {
                             openAppSettings()
                         }
                     )
                 }
                 
-                // MARK: - Suporte e Ajuda
-                Section("Suporte e Ajuda") {
+                // MARK: - Support & Help
+                Section("Support & Help") {
                     SettingsRow(
                         icon: "questionmark.circle",
                         iconColor: DesignSystem.Colors.warning,
-                        title: "Ajuda e Tutoriais",
-                        subtitle: "Como usar o Skinia",
+                        title: "Help & Tutorials",
+                        subtitle: "How to use Skinia",
                         action: {
                             showingHelpSheet = true
                         }
@@ -79,8 +79,8 @@ struct SettingsView: View {
                     SettingsRow(
                         icon: "envelope",
                         iconColor: DesignSystem.Colors.secondary,
-                        title: "Enviar Feedback",
-                        subtitle: "Sugestões e problemas",
+                        title: "Send Feedback",
+                        subtitle: "Suggestions and issues",
                         action: {
                             showingFeedbackSheet = true
                         }
@@ -89,21 +89,21 @@ struct SettingsView: View {
                     SettingsRow(
                         icon: "star",
                         iconColor: DesignSystem.Colors.warning,
-                        title: "Avaliar o App",
-                        subtitle: "Deixe sua avaliação na App Store",
+                        title: "Rate the App",
+                        subtitle: "Leave your review on the App Store",
                         action: {
                             openAppStore()
                         }
                     )
                 }
                 
-                // MARK: - Sobre
-                Section("Sobre") {
+                // MARK: - About
+                Section("About") {
                     SettingsRow(
                         icon: "info.circle",
                         iconColor: DesignSystem.Colors.textSecondary,
-                        title: "Sobre o Skinia",
-                        subtitle: "Versão 1.0.0",
+                        title: "About Skinia",
+                        subtitle: "Version 1.0.0",
                         action: {
                             showingAboutSheet = true
                         }
@@ -112,8 +112,8 @@ struct SettingsView: View {
                     SettingsRow(
                         icon: "doc.text",
                         iconColor: DesignSystem.Colors.textSecondary,
-                        title: "Termos de Uso",
-                        subtitle: "Termos e condições",
+                        title: "Terms of Use",
+                        subtitle: "Terms and conditions",
                         action: {
                             legalDocumentOpener.open(.termsOfUse)
                         }
@@ -122,8 +122,8 @@ struct SettingsView: View {
                     SettingsRow(
                         icon: "hand.raised",
                         iconColor: DesignSystem.Colors.textSecondary,
-                        title: "Política de Privacidade",
-                        subtitle: "Como protegemos seus dados",
+                        title: "Privacy Policy",
+                        subtitle: "How we protect your data",
                         action: {
                             legalDocumentOpener.open(.privacyPolicy)
                         }
@@ -131,7 +131,7 @@ struct SettingsView: View {
                 }
             }
             .listStyle(InsetGroupedListStyle())
-            .navigationTitle("Configurações")
+            .navigationTitle("Settings")
             .navigationBarTitleDisplayMode(.large)
         }
         .sheet(isPresented: $showingHelpSheet) {
@@ -154,6 +154,9 @@ struct SettingsView: View {
         }
     }
     
+    /// Opens the app's system Settings page if the URL can be constructed and the system can open it.
+    /// 
+    /// If the settings URL cannot be created or cannot be opened, the function returns without side effects.
     private func openAppSettings() {
         guard let settingsUrl = URL(string: UIApplication.openSettingsURLString) else {
             return
@@ -164,12 +167,13 @@ struct SettingsView: View {
         }
     }
     
+    /// Opens the app's App Store page using the configured App Store URL.
+    /// 
+    /// If the stored URL is invalid the function performs no action. The current URL is a placeholder and should be replaced with the app's real App Store ID before release.
     private func openAppStore() {
-        // TODO: Substituir pelo ID real do app quando publicado
-        let appStoreURL = URL(string: "https://apps.apple.com/app/id123456789")
-        if let url = appStoreURL {
-            UIApplication.shared.open(url)
-        }
+        // TODO: Replace with the real app ID once published
+        guard let url = URL(string: "https://apps.apple.com/app/id123456789") else { return }
+        UIApplication.shared.open(url)
     }
 }
 
@@ -218,7 +222,7 @@ struct SettingsRow: View {
     }
 }
 
-#Preview("Configurações") {
+#Preview("Settings") {
     SettingsView()
 }
 
@@ -236,13 +240,13 @@ private struct SettingsViewPreviewContainer: View {
                 }
             }
             .overlay(alignment: .top) {
-                PreviewInstructionLabel(text: "Toque nos links de Termos ou Privacidade para validar a prévia.")
+                PreviewInstructionLabel(text: "Tap the Terms or Privacy links to validate the preview.")
             }
             .animation(.easeInOut, value: legalOpener.lastOpenedDocument)
     }
 }
 
-#Preview("Configurações • Ações Legais") {
+#Preview("Settings • Legal Actions") {
     SettingsViewPreviewContainer()
 }
 #endif

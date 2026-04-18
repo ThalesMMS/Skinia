@@ -364,26 +364,20 @@ struct LegalLinksCard: View {
                     .font(.system(size: 24, weight: .medium))
                     .foregroundColor(DesignSystem.Colors.textSecondary)
                 
-                Text("Informações Legais")
+                Text("Legal Information")
                     .font(DesignSystem.Typography.headline)
                     .foregroundColor(DesignSystem.Colors.text)
             }
 
             VStack(spacing: DesignSystem.Spacing.sm) {
-                LegalLinkItem(title: "Termos de Uso", action: {
-                    legalDocumentOpener.open(.termsOfUse)
-                })
-
-                LegalLinkItem(title: "Política de Privacidade", action: {
-                    legalDocumentOpener.open(.privacyPolicy)
-                })
-
-                LegalLinkItem(title: "Licenças de Terceiros", action: {
-                    legalDocumentOpener.open(.thirdPartyLicenses)
-                })
+                ForEach(LegalDocument.allCases) { document in
+                    LegalLinkItem(title: document.localizedTitle) {
+                        legalDocumentOpener.open(document)
+                    }
+                }
             }
 
-            Text("Este app não armazena dados pessoais em servidores externos e respeita completamente sua privacidade.")
+            Text("This app does not store personal data on external servers and fully respects your privacy.")
                 .font(DesignSystem.Typography.caption)
                 .foregroundColor(DesignSystem.Colors.textTertiary)
                 .padding(.top, 4)
@@ -437,13 +431,13 @@ private struct LegalLinksCardPreviewContainer: View {
                 }
             }
             .overlay(alignment: .top) {
-                PreviewInstructionLabel(text: "Toque em qualquer link para verificar a ação simulada.")
+                PreviewInstructionLabel(text: "Tap any link to verify the simulated action.")
             }
             .animation(.easeInOut, value: legalOpener.lastOpenedDocument)
     }
 }
 
-#Preview("Card de Links Legais") {
+#Preview("Legal Links Card") {
     LegalLinksCardPreviewContainer()
 }
 #endif

@@ -2,27 +2,39 @@ import Foundation
 import SafariServices
 import UIKit
 
-/// Lista centralizada dos documentos legais disponíveis no app.
-enum LegalDocument: CaseIterable, Identifiable {
-    case termsOfUse
-    case privacyPolicy
-    case thirdPartyLicenses
+/// Centralized list of legal documents available in the app.
+enum LegalDocument: String, CaseIterable, Identifiable {
+    case termsOfUse = "terms_of_use"
+    case privacyPolicy = "privacy_policy"
+    case thirdPartyLicenses = "third_party_licenses"
 
-    var id: String { localizedTitle }
+    var id: String { rawValue }
 
-    /// Título amigável do documento para uso em testes e prévias.
+    /// User-facing document title displayed in AboutView and reused by tests and previews.
     var localizedTitle: String {
         switch self {
         case .termsOfUse:
-            return "Termos de Uso"
+            return String(
+                localized: "TermsOfUseTitle",
+                defaultValue: "Terms of Use",
+                comment: "Title for the terms of use legal document."
+            )
         case .privacyPolicy:
-            return "Política de Privacidade"
+            return String(
+                localized: "PrivacyPolicyTitle",
+                defaultValue: "Privacy Policy",
+                comment: "Title for the privacy policy legal document."
+            )
         case .thirdPartyLicenses:
-            return "Licenças de Terceiros"
+            return String(
+                localized: "ThirdPartyLicensesTitle",
+                defaultValue: "Third-Party Licenses",
+                comment: "Title for the third-party licenses legal document."
+            )
         }
     }
 
-    /// URL associada ao documento.
+    /// URL associated with the document.
     var url: URL? {
         switch self {
         case .termsOfUse:
@@ -35,14 +47,14 @@ enum LegalDocument: CaseIterable, Identifiable {
     }
 }
 
-struct LegalResources {
-    /// URL oficial com os termos de uso do Skinia.
+enum LegalResources {
+    /// Official URL for Skinia's terms of use.
     static let termsOfUseURL = URL(string: "https://skinia.app/legal/terms")
 
-    /// URL oficial com a política de privacidade do Skinia.
+    /// Official URL for Skinia's privacy policy.
     static let privacyPolicyURL = URL(string: "https://skinia.app/legal/privacy")
 
-    /// URL com as licenças de código aberto utilizadas pelo app.
+    /// URL for the open-source licenses used by the app.
     static let thirdPartyLicensesURL = URL(string: "https://skinia.app/legal/licenses")
 }
 
@@ -78,6 +90,9 @@ final class LegalDocumentOpener: LegalDocumentOpening {
 }
 
 private extension UIApplication {
+    /// Finds the app's current top-most view controller.
+    /// - Parameter controller: The starting controller to inspect. If omitted, the function uses the key window's `rootViewController` from the app's connected `UIWindowScene` instances.
+    /// - Returns: The view controller that is currently visible to the user, or `nil` if none.
     func topMostViewController(
         controller: UIViewController? = UIApplication.shared.connectedScenes
             .compactMap { $0 as? UIWindowScene }
@@ -100,4 +115,3 @@ private extension UIApplication {
         return controller
     }
 }
-

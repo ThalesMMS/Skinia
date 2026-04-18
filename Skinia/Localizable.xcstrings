@@ -1,0 +1,42 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "PrivacyPolicyTitle" : {
+      "comment" : "Title for the privacy policy legal document.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Privacy Policy"
+          }
+        }
+      }
+    },
+    "TermsOfUseTitle" : {
+      "comment" : "Title for the terms of use legal document.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Terms of Use"
+          }
+        }
+      }
+    },
+    "ThirdPartyLicensesTitle" : {
+      "comment" : "Title for the third-party licenses legal document.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Third-Party Licenses"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}

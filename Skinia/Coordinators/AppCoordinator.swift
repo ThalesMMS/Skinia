@@ -53,33 +53,34 @@ final class AppCoordinator: TabCoordinator, ObservableObject {
         ]
     }
     
+    /// Builds the app's main tab-based interface with Analysis, Camera, and Settings tabs.
     @ViewBuilder
     func build() -> some View {
         TabView(selection: Binding(
             get: { self.selectedTab },
             set: { self.selectedTab = $0 }
         )) {
-            // Tab 1: Análises (Lista principal)
+            // Tab 1: Analysis (Main list)
             analysisListCoordinator.build()
                 .tabItem {
                     Image(systemName: "photo.stack")
-                    Text("Análises")
+                    Text("Analyses")
                 }
                 .tag(0)
-            
-            // Tab 2: Nova Foto (Captura)
+
+            // Tab 2: New Photo (Capture)
             cameraCoordinator.build()
                 .tabItem {
                     Image(systemName: "plus")
-                    Text("Nova Foto")
+                    Text("New Photo")
                 }
                 .tag(1)
             
-            // Tab 3: Configurações
+            // Tab 3: Settings
             settingsCoordinator.build()
                 .tabItem {
                     Image(systemName: "gear")
-                    Text("Configurações")
+                    Text("Settings")
                 }
                 .tag(2)
         }
