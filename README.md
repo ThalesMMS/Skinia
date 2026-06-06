@@ -1,9 +1,22 @@
-# SkinIa (Work in Progress – No Image Analysis Backend Yet)
+# Skinia (WIP — no image analysis backend yet)
 
-Skinia is an iOS application under active development that focuses on documenting dermatological lesions and preparing them for automated assessment. The current build operates entirely on-device and does not communicate with a remote image analysis backend yet.
+Skinia is an iOS prototype for documenting skin lesions and preparing cases for future automated assessment. The current build runs locally and does not send images to a remote analysis service yet.
+
+## At a Glance
+- **Status:** work in progress / prototype
+- **What works today:** local photo and case-review flows, analysis list/detail screens, mocked results for previews/tests, and MVVM-C app structure
+- **Not implemented yet:** a production image-analysis backend, real clinical inference, or end-to-end remote submission
+
+## 30-Second Quickstart
+```bash
+git clone https://github.com/ThalesMMS/Skinia.git
+cd Skinia
+open Skinia.xcodeproj
+```
+Then build and run the `Skinia` scheme in Xcode.
 
 ## Current Capabilities
-- Analysis list that surfaces the locally stored photos prepared for evaluation.
+- Analysis list that surfaces locally stored photos prepared for evaluation.
 - Detailed analysis view displaying mock inference results for previews and tests.
 - Accessibility coverage that includes VoiceOver labels, Dynamic Type, and focus order checks.
 - Loading and empty states integrated into the SwiftUI navigation flow.
@@ -61,7 +74,7 @@ Skinia/
 
 ### Setup
 ```bash
-git clone https://github.com/[user]/Skinia.git
+git clone https://github.com/ThalesMMS/Skinia.git
 cd Skinia
 open Skinia.xcodeproj
 ```
